@@ -1,0 +1,53 @@
+{
+  "$schema": "https://charm.land/crush.json",
+  "providers": {
+    "openwebui": {
+      "type": "openai",
+      "name": "Open WebUI (Turbo via ollama.com)",
+      "base_url": "https://chat.feliperiveroll.info/api",
+      "api_key": "sk-bee629a068d342c4af17fb0476cc2e3f",
+      "models": [
+        {
+          "id": "Ollama Turbo.gpt-oss:120b",
+          "name": "gpt-oss:120b (Turbo @ OWUI)",
+          "context_window": 128000,
+          "default_max_tokens": 8000
+        },
+        {
+          "id": "Ollama Turbo.gpt-oss:20b",
+          "name": "gpt-oss:20b (Turbo @ OWUI)",
+          "context_window": 128000,
+          "default_max_tokens": 8000
+        }
+      ]
+    }
+  },
+  "mcp": {
+    "serena": {
+      "type": "stdio",
+      "command": "/home/evelyn/.local/bin/uvx",
+      "args": ["--from", "git+https://github.com/oraios/serena", "serena", "start-mcp-server"]
+    },
+    "sequential-thinking": {
+      "type": "stdio",
+      "command": "/home/evelyn/.local/bin/uvx",
+      "args": [
+        "--from",
+        "git+https://github.com/arben-adm/mcp-sequential-thinking",
+        "--with",
+        "portalocker",
+        "mcp-sequential-thinking"
+      ]
+    },
+    "context7": {
+      "type": "http",
+      "url": "https://mcp.context7.com/mcp"
+    },
+    "git": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": ["mcp-server-git"]
+    }
+  }
+
+}

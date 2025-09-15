@@ -1,0 +1,175 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Varela Round', sans-serif;
+}
+
+body {
+    background: #000001;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    padding: 20px;
+}
+
+.login-container {
+    width: 100%;
+    max-width: 450px;
+    background: #1a1b1af2;
+    border-radius: 16px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+    padding: 35px;
+    text-align: center;
+    border: 1px solid #2a2a2a;
+    backdrop-filter: blur(5px);
+}
+
+.logo {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 25px;
+    color: #851E23; /* Rojo ladrillo como el logo */
+    font-size: 22px;
+    font-weight: bold;
+}
+
+.logo i {
+    font-size: 28px;
+    margin-right: 10px;
+    opacity: 0.9;
+}
+
+h2 {
+    font-size: 26px;
+    margin-bottom: 8px;
+    color: rgba(235, 235, 235, 0.95);
+    font-weight: 600;
+}
+
+.subtitle {
+    color: rgba(160, 160, 160, 0.85);
+    margin-bottom: 25px;
+    font-size: 14px;
+}
+
+.input-group {
+    position: relative;
+    margin-bottom: 18px;
+    text-align: left;
+}
+
+.input-group label {
+    display: block;
+    margin-bottom: 6px;
+    color: rgba(220, 220, 220, 0.9);
+    font-weight: 500;
+    font-size: 14px;
+}
+
+.input-group input {
+    width: 100%;
+    padding: 14px 42px 14px 14px;
+    background: rgba(40, 40, 40, 0.8);
+    border: 1px solid rgba(70, 70, 70, 0.7);
+    border-radius: 8px;
+    font-size: 15px;
+    transition: all 0.25s;
+    color: rgba(255, 255, 255, 0.95);
+}
+
+.input-group input:focus {
+    border-color: #9e2b2b;
+    box-shadow: 0 0 0 2px rgba(158, 43, 43, 0.2);
+    outline: none;
+    background: rgba(44, 44, 44, 0.9);
+}
+
+.input-group input::placeholder {
+    color: rgba(130, 130, 130, 0.7);
+}
+
+.input-group i {
+    position: absolute;
+    right: 15px;
+    top: 38px;
+    color: rgba(136, 136, 136, 0.8);
+    cursor: pointer;
+    font-size: 15px;
+}
+
+.login-button {
+    width: 100%;
+    padding: 14px;
+    background: #851E23; /* Rojo del logo */
+    color: rgba(255, 255, 255, 0.95);
+    border: none;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.25s;
+    margin-top: 15px;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
+}
+
+.login-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.4);
+    background: #851E23; /* Un rojo un poco más claro en hover */
+}
+
+.bottom-links {
+    margin-top: 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.forgot-password, .create-account {
+    color: rgba(160, 160, 160, 0.8);
+    font-size: 13px;
+}
+
+.forgot-password a, .create-account a {
+    color: #851E23; /* Rojo del logo */
+    font-weight: 500;
+    text-decoration: none;
+    transition: color 0.2s;
+}
+
+.forgot-password a:hover, .create-account a:hover {
+    text-decoration: underline;
+    color: #851E23;
+}
+
+.input-group input.error {
+    border: 1px solid #851E23;
+    animation: shake 0.3s ease-in-out;
+}
+
+.error-message {
+    display: none;
+    color: #851E23;
+    font-size: 12px;
+    margin-top: 4px;
+    padding-left: 2px;
+    transition: all 0.25s ease;
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    20%, 60% { transform: translateX(-3px); }
+    40%, 80% { transform: translateX(3px); }
+}
+
+.login-container {
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.login-container:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.5);
+}

@@ -1,0 +1,53 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Iniciar Sesión - Asiatech</title>
+    <link rel="icon" href="../img/logo.png" type="image/png">
+    <link rel="stylesheet" href="{% static 'css/iniciar_sesion.css' %}" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Varela+Round&display=swap" rel="stylesheet" />
+</head>
+<body>
+    <div class="login-container">
+        <div class="logo">
+            <i class="fas fa-laptop-code"></i>
+            <span>Asiatech</span>
+        </div>
+        
+        <h2>Iniciar Sesión</h2>
+        <p class="subtitle">Ingresa a tu cuenta</p>
+        
+        <form id="loginForm" method="POST" action="{% url 'login' %}">
+            {% csrf_token %}
+            <div class="input-group">
+                <label for="email">Correo electrónico:</label>
+                <input type="email" id="email" name="email" required />
+                <i class="fa-solid fa-envelope"></i>
+                {% if error %}
+                <span class="error-message"></span>
+                {% endif %}
+            </div>
+            
+            <div class="input-group">
+                <label for="password">Contraseña:</label>
+                <input type="password" id="password" name="password" required />
+                <i class="fas fa-eye toggle-password"></i>
+                <span class="error-message"></span>
+            </div>
+            
+            <button type="submit" class="login-button">Iniciar Sesión</button>
+    </div>
+    <script type="module">
+    import { checkAuth, disableCache, logout } from '../js/auth.js';
+    document.addEventListener('DOMContentLoaded', () => {
+        disableCache();
+        if (!checkAuth()) return;
+    });
+    document.getElementById('logoutBtn')?.addEventListener('click', logout);
+    </script>
+    <script src="{% static 'js/iniciar_sesion.js' %}"></script>
+</body>
+</html>
