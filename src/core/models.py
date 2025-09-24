@@ -56,6 +56,7 @@ class DiaSemana(models.Model):
         # Basado en :contentReference[oaicite:10]{index=10}
 
 class AsignacionHorario(models.Model):
+    
     asignacion_id = models.AutoField(primary_key=True, db_column='asignacion_id')
     empleado = models.ForeignKey(Empleado, on_delete=models.CASCADE, db_column='empleado_id', related_name='asignaciones')
     sucursal = models.ForeignKey(Sucursal, on_delete=models.CASCADE, db_column='sucursal_id', related_name='asignaciones')
@@ -66,7 +67,7 @@ class AsignacionHorario(models.Model):
     hora_entrada_especifica = models.TimeField(null=True, blank=True, db_column='hora_entrada_especifica')
     hora_salida_especifica = models.TimeField(null=True, blank=True, db_column='hora_salida_especifica')
     hora_salida_especifica_cruza_medianoche = models.BooleanField(default=False, db_column='hora_salida_especifica_cruza_medianoche')
-    comentarios = models.CharField(max_length=255, null=True, blank=True, db_column='comentarios')
+    comentarios = models.CharField(max_length=255, null=True, blank=True, db_column='comentarios')    
 
     class Meta:
         db_table = 'AsignacionHorario'
@@ -74,11 +75,11 @@ class AsignacionHorario(models.Model):
             ('empleado', 'sucursal', 'dia_especifico', 'es_primera_quincena'),
         )
         indexes = [
-            models.Index(fields=['empleado', 'dia_especifico']),
-            models.Index(fields=['empleado', 'sucursal']),
-            models.Index(fields=['horario']),
-            models.Index(fields=['tipo_turno']),
-            models.Index(fields=['dia_especifico']),
+            models.Index(fields=['empleado_id', 'dia_especifico_id']),
+            models.Index(fields=['empleado_id', 'sucursal_id']),
+            models.Index(fields=['horario_id']),
+            models.Index(fields=['tipo_turno_id']),
+            models.Index(fields=['dia_especifico_id']),
         ]
         # Basado en :contentReference[oaicite:11]{index=11}
 class ResumenHorario(models.Model):

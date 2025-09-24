@@ -59,14 +59,22 @@ def gestion_empleados(request):
 @login_required
 def crear_empleado(request):
     if request.method == "POST":
-        data = request.POST
+        # Imprimir todo el POST para debug
+        print("===== [DEBUG] request.POST =====")
+        for key, value in request.POST.lists():
+            print(f"{key}: {value}")
+        print("================================")
+
         try:
-            crear_empleado_service(data)
+            # Pasamos directamente el POST al service
+            crear_empleado_service(request.POST)
             messages.success(request, "Empleado creado correctamente.")
         except Exception as e:
-            messages.error(request, "Error al crear empleado.")
+            print("[ERROR en crear_empleado]:", str(e))
+            messages.error(request, f"Error al crear empleado: {e}")
+
         # Redirige después del POST para evitar resubmit
-        return redirect('admin-gestion-empleados') 
+        return redirect('admin-gestion-empleados')
 
     return render(request, "gestion_empleados.html")
 

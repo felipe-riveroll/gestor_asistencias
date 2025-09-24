@@ -68,7 +68,7 @@ document.addEventListener("DOMContentLoaded", () => {
       horarioSelect.options[horarioSelect.selectedIndex]?.text;
     const diasSeleccionados = Array.from(
       document.querySelectorAll(".day-checkbox:checked")
-    ).map((cb) => cb.value);
+    ).map((cb) => cb.dataset.id);
 
     // Validar
     if (!sucursalId || !horarioId || diasSeleccionados === 0) {
@@ -84,6 +84,7 @@ document.addEventListener("DOMContentLoaded", () => {
   <span class="tag-dia">${diasSeleccionados.join(", ")}</span>
   <span class="tag-horas">${horarioText}</span>
   <button type="button" class="delete-btn"><i class="fas fa-times"></i></button>
+  
   <input type="hidden" name="sucursales[]" value="${sucursalId}">
   <input type="hidden" name="horarios[]" value="${horarioId}">
   <input type="hidden" name="dias[]" value="${diasSeleccionados.join(",")}">
@@ -136,47 +137,4 @@ document.addEventListener("DOMContentLoaded", () => {
     scheduleModal.style.display = "none";
   });
 
-  // Botón importar desde Excel
-  btnImport.addEventListener("click", () => {
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = ".xlsx,.xls";
-    input.onchange = (e) => {
-      const file = e.target.files[0];
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        const data = ev.target.result;
-        const workbook = XLSX.read(data, { type: "binary" });
-        const sheetName = workbook.SheetNames[0];
-        const sheet = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
-
-        sheet.forEach((row) => {
-          employees.push({
-            id: Date.now().toString(),
-            codigoFrappe: row["Código Frappe"] || "",
-            codigoChecador: row["Código Checador"] || "",
-            nombre: row["Nombre"] || "",
-            primerApellido: row["Primer Apellido"] || "",
-            segundoApellido: row["Segundo Apellido"] || "",
-            email: row["Email"] || "",
-            sucursal: row["Sucursal"] || "",
-            horario: row["Horario"] || "",
-          });
-        });
-        renderTable();
-      };
-      reader.readAsBinaryString(file);
-    };
-    input.click();
-  });
-
-  // Botón exportar a Excel
-  btnExportExcel.addEventListener("click", exportToExcel);
-
-  // Botón exportar a PDF
-  btnExportPDF.addEventListener("click", exportToPDF);
-
-  // Inicialización
-  renderTable();
-  autoRefreshTable();
 });
