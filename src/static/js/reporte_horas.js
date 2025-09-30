@@ -1,90 +1,178 @@
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener("DOMContentLoaded", () => {
+    const startDateInput = document.getElementById("startDate");
+    const endDateInput = document.getElementById("endDate");
+    const sucursalSelect = document.getElementById("sucursal");
+    const empleadoInput = document.getElementById("empleado");
+    const downloadBtn = document.getElementById("downloadBtn");
+    const reporteBody = document.getElementById("reporteBody");
 
-    // Simulación de datos (reemplazar con tu llamada a la API si es necesario)
-    const datosCompletos = {
-        "31pte": [
-            { noEmp: "1001", nombre: "Ana Gómez", unidad: "Contabilidad", fechaGen: "2025-08-01", motivo: "Horas Extra", responsable: "J. Martínez", horasGen: "8", fechasTomadas: "2025-08-05, 2025-08-06", horasTomadas: "4", restante: "4", actualizacion: "2025-08-07", observaciones: "Ninguna" },
-            { noEmp: "1002", nombre: "Luis Pérez", unidad: "Ventas", fechaGen: "2025-08-02", motivo: "Compensación", responsable: "M. López", horasGen: "6", fechasTomadas: "2025-08-04", horasTomadas: "6", restante: "0", actualizacion: "2025-08-06", observaciones: "" }
-        ],
-        "villas": [
-            { noEmp: "2001", nombre: "María Rodríguez", unidad: "Logística", fechaGen: "2025-08-03", motivo: "Horas Extra", responsable: "R. Sánchez", horasGen: "5", fechasTomadas: "2025-08-07", horasTomadas: "2", restante: "3", actualizacion: "2025-08-08", observaciones: "Revisión pendiente" }
-        ],
-        "nave": [],
-        "rioblanco": []
-    };
+    if (!startDateInput || !endDateInput || !sucursalSelect || !empleadoInput || !downloadBtn || !reporteBody) {
+        console.error("Algún elemento no fue encontrado en el DOM. Revisa los id del HTML.");
+        return;
+    }
 
-    // Referencias a los elementos del DOM
-    const sucursalSelect = document.getElementById('sucursal');
-    const searchInput = document.getElementById('searchInput'); // <-- NUEVO: Selector para la búsqueda
-    const tbody = document.getElementById('reporteBody');
-    const downloadBtn = document.getElementById('downloadBtn');
+    // Establecer fechas por defecto (hoy y hace 7 días)
+    const today = new Date();
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(today.getDate() - 7);
+    
+    // Formato YYYY-MM-DD para input[type="date"]
+    startDateInput.value = sevenDaysAgo.toISOString().split('T')[0];
+    endDateInput.value = today.toISOString().split('T')[0];
 
-    function cargarDatos() {
-        // Obtenemos los valores actuales de los filtros
-        const sucursal = sucursalSelect.value;
-        const terminoBusqueda = searchInput.value.toLowerCase().trim(); // <-- NUEVO: Obtenemos el texto a buscar
+    async function cargarReporte() {
+        // Opcional: Agregar una clase para mostrar un estado de carga visualmente
+        // Por ejemplo: reporteBody.innerHTML = "<tr><td colspan='14'>Cargando...</td></tr>";
+        
+        try {
+            console.log("🔄 Iniciando carga de reporte...");
+            
+            const startDate = startDateInput.value;
+            const endDate = endDateInput.value;
+            const sucursal = sucursalSelect.value;
+            const empleado = empleadoInput.value.trim();
 
-        tbody.innerHTML = ''; // Limpiamos la tabla
+            console.log("📋 Parámetros:", { startDate, endDate, sucursal, empleado });
 
-        let datos = [];
-        // Seleccionamos los datos base según la sucursal
-        if (sucursal === 'all' || sucursal === "") { // Asumimos que "" es igual a "todas"
-            datos = Object.values(datosCompletos).flat();
-        } else if (datosCompletos[sucursal]) {
-            datos = datosCompletos[sucursal];
+            if (!startDate || !endDate) {
+                console.log("⏸️ Fechas no seleccionadas, pausando");
+                reporteBody.innerHTML = "<tr><td colspan='14'>Selecciona un rango de fechas.</td></tr>";
+                return;
+            }
+
+            const params = new URLSearchParams();
+            params.append("startDate", startDate);
+            params.append("endDate", endDate);
+            if (sucursal) params.append("sucursal", sucursal);
+            if (empleado) params.append("empleado", empleado);
+
+            // ⚠️ CORRECCIÓN CLAVE: Se usó 'template literal' (backticks) para la URL
+            const url = `/api/reporte_horas/?${params.toString()}`;
+            console.log("🌐 URL completa:", url);
+
+            console.log("📤 Enviando solicitud...");
+            const response = await fetch(url);
+            console.log("📥 Respuesta recibida. Status:", response.status);
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error("❌ Error del servidor:", errorText);
+                
+                // ⚠️ CORRECCIÓN CLAVE: Se usó 'template literal' (backticks) para el mensaje de error
+                let errorMessage = `Error ${response.status}`;
+                try {
+                    const errorData = JSON.parse(errorText);
+                    errorMessage += `: ${errorData.error || errorData.details || response.statusText}`;
+                } catch {
+                    errorMessage += `: ${errorText.substring(0, 100)}...`;
+                }
+                
+                throw new Error(errorMessage);
+            }
+
+            const result = await response.json();
+            console.log("✅ Datos recibidos:", result);
+            
+            if (result.data && Array.isArray(result.data)) {
+                // ⚠️ CORRECCIÓN CLAVE: Se usó 'template literal' (backticks) para el log
+                console.log(`📊 ${result.data.length} registros procesados`);
+                mostrarDatos(result.data);
+            } else {
+                console.warn("⚠️ No hay datos o formato incorrecto:", result);
+                reporteBody.innerHTML = "<tr><td colspan='14'>No se encontraron datos o el formato es incorrecto.</td></tr>";
+            }
+            
+        } catch (err) {
+            console.error("💥 Error completo:", err);
+            // Opcional: Mostrar un mensaje menos intrusivo que 'alert'
+            reporteBody.innerHTML = `<tr><td colspan='14' style="color: red;">Error al cargar: ${err.message}</td></tr>`;
+            // alert("Error: " + err.message); // Mantenemos el alert original, pero se sugiere mejor UX
         }
+    }
 
-        // <-- INICIO DE LA LÓGICA DE FILTRADO -->
-        let datosFiltrados = datos;
-        if (terminoBusqueda) {
-            datosFiltrados = datos.filter(registro => {
-                const nombre = registro.nombre.toLowerCase();
-                const noEmp = registro.noEmp.toString();
-                return nombre.includes(terminoBusqueda) || noEmp.includes(terminoBusqueda);
-            });
+    function mostrarDatos(datos) {
+        reporteBody.innerHTML = "";
+        
+        if (datos.length === 0) {
+            reporteBody.innerHTML = "<tr><td colspan='14'>No se encontraron registros para los filtros seleccionados</td></tr>";
+            return;
         }
-        // <-- FIN DE LA LÓGICA DE FILTRADO -->
+        
+        datos.forEach(d => {
+            const row = document.createElement("tr");
+            // Nota: Los campos de aquí deben ser revisados con el output real de tu API.
+            // Se mantiene la estructura original ya que es una presunción de tu API.
+            // ⚠️ CORRECCIÓN CLAVE: Se corrigieron los backticks del template literal.
+            row.innerHTML = `
+                <td>${d.employee || ''}</td>
+                <td>${d.Nombre || 'Sin nombre'}</td>
+                <td>${d.total_horas_trabajadas || '00:00:00'}</td>
+                <td>${d.total_horas_esperadas || '08:00:00'}</td>
+                <td>${d.total_horas_descontadas_permiso || '00:00:00'}</td>
+                <td>${d.total_horas_descanso || '00:00:00'}</td>
+                <td>${d.total_horas || '00:00:00'}</td>
+                <td>${d.total_retardos || '00:00:00'}</td>
+                <td>${d.faltas_del_periodo || '0'}</td>
+                <td>${d.faltas_justificadas || '0'}</td>
+                <td>${d.total_faltas || '0'}</td>
+                <td>${d.episodios_ausencia || '0'}</td>
+                <td>${d.total_salidas_anticipadas || '00:00:00'}</td>
+                <td>${d.diferencia_HHMMSS || '00:00:00'}</td>
+            `;
+            reporteBody.appendChild(row);
+        });
+    }
 
-        // Mostramos los datos filtrados o un mensaje si no hay resultados
-        if (datosFiltrados.length === 0) {
-            const tr = document.createElement('tr');
-            const td = document.createElement('td');
-            td.colSpan = 12; // Ajusta al número de columnas de tu tabla
-            td.className = "no-data";
-            td.textContent = 'No se encontraron registros que coincidan con los filtros.';
-            tr.appendChild(td);
-            tbody.appendChild(tr);
+    // Asegúrate de que la librería 'xlsx' (sheet.js) esté cargada en tu HTML.
+    function downloadExcel() {
+        if (typeof XLSX === 'undefined') {
+            alert("Error: La librería XLSX (SheetJS) no está cargada.");
             return;
         }
 
-        datosFiltrados.forEach(registro => {
-            const tr = document.createElement('tr');
-            // Asegúrate que los campos coincidan con tu tabla HTML
-            const campos = ['noEmp', 'nombre', 'unidad', 'fechaGen', 'motivo', 'responsable', 'horasGen', 'fechasTomadas', 'horasTomadas', 'restante', 'actualizacion', 'observaciones'];
-            campos.forEach(campo => {
-                const td = document.createElement('td');
-                td.textContent = registro[campo] || '';
-                tr.appendChild(td);
-            });
-            tbody.appendChild(tr);
+        const startDate = startDateInput.value;
+        const endDate = endDateInput.value;
+        const sucursal = sucursalSelect.value;
+        
+        const wb = XLSX.utils.book_new();
+        // Intentar obtener los encabezados de la tabla
+        const headersElement = document.querySelectorAll("#reporteTable thead th");
+        if (headersElement.length === 0) {
+            console.warn("No se encontraron encabezados de tabla para el reporte.");
+            // Si no hay encabezados, salimos o usamos un set predefinido
+            alert("Advertencia: No se encontraron encabezados de tabla. Asegúrate de que la tabla 'reporteTable' esté bien definida.");
+            return; 
+        }
+
+        const headers = Array.from(headersElement).map(th => th.textContent.trim());
+        const wsData = [headers];
+
+        // Obtener datos del cuerpo de la tabla
+        document.querySelectorAll("#reporteTable tbody tr").forEach(tr => {
+            const row = Array.from(tr.querySelectorAll("td")).map(td => td.textContent.trim());
+            // Solo añadir filas que contengan datos, no las de 'No se encontraron registros'
+            if (row.length > 1 && !row[0].includes("No se encontraron")) {
+                wsData.push(row);
+            }
         });
+
+        const ws = XLSX.utils.aoa_to_sheet(wsData);
+        XLSX.utils.book_append_sheet(wb, ws, "Reporte");
+        
+        // ⚠️ CORRECCIÓN CLAVE: Se usó 'template literal' (backticks) para el nombre del archivo
+        const fileName = `reporte_horas_${startDate}_a_${endDate}_${sucursal || 'Todas'}.xlsx`;
+        XLSX.writeFile(wb, fileName);
     }
-    
-    // Función de descarga (no necesita cambios)
-    function descargarExcel() {
-        // ... (Tu función de descarga actual puede permanecer aquí)
-    }
 
-    // --- EVENT LISTENERS ---
-    
-    // Se ejecuta cuando cambia la sucursal
-    sucursalSelect.addEventListener('change', cargarDatos);
+    // Event listeners
+    startDateInput.addEventListener("change", cargarReporte);
+    endDateInput.addEventListener("change", cargarReporte);
+    // Nota: El evento 'change' en un select es más apropiado que 'input'
+    sucursalSelect.addEventListener("change", cargarReporte); 
+    // Usar 'input' permite un filtrado inmediato mientras el usuario escribe
+    empleadoInput.addEventListener("input", cargarReporte); 
+    downloadBtn.addEventListener("click", downloadExcel);
 
-    // <-- NUEVO: Se ejecuta cada vez que el usuario escribe en la barra de búsqueda -->
-    searchInput.addEventListener('input', cargarDatos);
-    
-    downloadBtn.addEventListener('click', descargarExcel);
-
-    // Carga inicial (tabla vacía)
-    cargarDatos();
+    // Carga inicial
+    cargarReporte();
 });

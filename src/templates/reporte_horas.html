@@ -17,7 +17,6 @@
   <link rel="icon" href="{% static 'img/logo.png' %}" type="image/png">
 
   <!-- Librerías externas -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
 </head>
 <body>
@@ -94,7 +93,7 @@
     <!-- CONTENIDO PRINCIPAL -->
     <div class="report-container">
       <div class="header">
-        <h1>Reporte de Asistencias</h1>
+        <h1>Reporte de Horas</h1>
       </div>
 
       <!-- FILTROS -->
@@ -110,7 +109,7 @@
         <div class="filter-group">
           <label for="sucursal">Sucursal:</label>
           <select id="sucursal">
-            <option value="">Todas las sucursales</option>
+            <option value="Todas">Todas las sucursales</option>
             <option value="Villas">Villas</option>
             <option value="31pte">31 pte</option>
             <option value="Nave">Nave</option>
@@ -118,8 +117,8 @@
           </select>
         </div>
         <div class="filter-group">
-          <label for="searchInput">Buscador:</label>
-          <input type="text" id="searchInput" placeholder="Buscar...">
+          <label for="empleado">Buscador:</label>
+          <input type="text" id="empleado" placeholder="Buscar...">
         </div>
 
         <div class="btn-group">
@@ -128,7 +127,6 @@
           </button>
         </div>
       </div>
-
       <!-- TABLA -->
       <div class="table-container">
         <table id="reporteTable" class="tabla-reporte">
@@ -150,15 +148,14 @@
               <th>diferencia_HHMMSS</th>
             </tr>
           </thead>
-          <tbody id="reporteBody">
-            <!-- Se llena dinámicamente -->
-          </tbody>
+          <tbody id="reporteBody"></tbody>
         </table>
       </div>
     </div>
   </div>
 
   <!-- Script personalizado -->
+  <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
   <script src="{% static 'js/reporte_horas.js' %}"></script>
 </body>
 </html>

@@ -1,4 +1,19 @@
-django
-psycopg[binary]
-pyyaml
-gunicorn
+# Framework principal de Django
+Django==5.0.7
+
+# Conector para la base de datos PostgreSQL
+psycopg2-binary==2.9.9
+
+# Servidor de producción para Python
+gunicorn==23.0.0
+
+# Para hacer peticiones HTTP a la API externa
+requests==2.32.3
+
+# Para manejar zonas horarias
+pytz==2024.1
+
+# Para leer variables de entorno desde el archivo .env
+python-dotenv==1.0.1
+
+pandas==2.3.1

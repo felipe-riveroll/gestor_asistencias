@@ -14,6 +14,7 @@ urlpatterns = [
     path("empleados/eliminar/<int:empleado_id>/", views.eliminar_empleado, name="eliminar-empleado"),
     path("empleados/crear-horario/", views.crear_horario, name="crear_horario"),
     path("gestion_usuarios/", views.gestion_usuarios, name="gestion_usuarios"),
-    path("reporte_horas/", views.reporte_horas, name="reporte_horas"),
     path("lista_asistencias/", views.lista_asistencias, name="lista_asistencias"),
+    path("reporte_horas/", views.reporte_horas, name="reporte_horas"),
+    path("api/reporte_horas/", views.api_reporte_horas, name="reporte_horas_api"),
 ]
