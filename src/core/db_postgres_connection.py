@@ -1,92 +1,237 @@
-def obtener_horario_empleado(*args):
+"""
+Conexión a base de datos PostgreSQL para horarios - VERSIÓN CORREGIDA
+Con fórmulas según documentación: Horas Efectivas = Horas Totales - 1 hora descanso (SIEMPRE)
+"""
+
+def obtener_horario_empleado_completo(employee_code: str, fecha: str = None):
     """
-    VERSIÓN DEFINITIVA CORREGIDA - Sin errores de SQL
+    VERSIÓN CORREGIDA - Siempre resta 1 hora de descanso
     """
-    employee_code = args[0] if args else None
-    
-    print(f"🔍 Obteniendo horario para: {employee_code}")
+    print(f"🔍 Obteniendo horario COMPLETO para: {employee_code}")
     
     if not employee_code:
-        return get_default_schedule()
+        return _crear_horario_por_defecto()
     
-    try:
-        employee_id = int(employee_code)
-        result = get_schedule_by_id(employee_id)
-        if result:
-            return result
-    except (ValueError, TypeError) as e:
-        print(f"❌ Error convirtiendo código: {e}")
-    
-    return get_default_schedule()
-
-def get_schedule_by_id(employee_id):
-    """Buscar horario por ID numérico"""
     try:
         from django.db import connection
         
+        # Convertir employee_code a entero
+        employee_id = int(employee_code)
+        
+        # Determinar quincena basada en la fecha
+        es_primera_quincena = True  # Por defecto
+        if fecha:
+            try:
+                from datetime import datetime
+                fecha_dt = datetime.strptime(fecha, '%Y-%m-%d')
+                dia = fecha_dt.day
+                es_primera_quincena = dia <= 15
+                print(f"   📅 Fecha {fecha}: {'1ra' if es_primera_quincena else '2da'} quincena")
+            except:
+                pass
+        
+        # Llamar a la función PostgreSQL completa
         query = """
-        SELECT 
-            h.hora_entrada, 
-            h.hora_salida, 
-            h.cruza_medianoche,
-            e.nombre || ' ' || e.apellido_paterno as nombre_completo
-        FROM "AsignacionHorario" a
-        INNER JOIN "Horario" h ON a.horario_id = h.horario_id
-        INNER JOIN "Empleados" e ON a.empleado_id = e.empleado_id
-        WHERE e.codigo_checador = %s OR e.codigo_frappe = %s
-        LIMIT 1
+        SELECT * FROM f_tabla_horarios_multi_quincena('Todas')
+        WHERE codigo_frappe = %s AND es_primera_quincena = %s
         """
         
         with connection.cursor() as cursor:
-            cursor.execute(query, [employee_id, employee_id])
+            cursor.execute(query, [employee_id, es_primera_quincena])
+            columns = [col[0] for col in cursor.description]
             result = cursor.fetchone()
             
             if result:
-                print(f"✅ Horario encontrado para {employee_id}")
-                return format_schedule_result(result)
+                horario_dict = dict(zip(columns, result))
+                print(f"✅ Horario COMPLETO encontrado para {employee_code}")
+                return _formatear_resultado_horario_corregido(horario_dict, employee_code)
             else:
-                print(f"⚠️ No se encontró horario para {employee_id}")
+                print(f"⚠️ No se encontró horario completo para {employee_code}")
                 
     except Exception as e:
-        print(f"❌ Error buscando por ID {employee_id}: {e}")
+        print(f"❌ Error obteniendo horario completo: {e}")
     
-    return None
+    return _crear_horario_por_defecto(employee_code)
 
-def format_schedule_result(result):
-    """Formatear resultado de la consulta"""
-    try:
-        hora_entrada = str(result[0])
-        hora_salida = str(result[1])
-        
-        if len(hora_entrada.split(':')) == 2:
-            hora_entrada += ":00"
-        if len(hora_salida.split(':')) == 2:
-            hora_salida += ":00"
-            
-        horario = {
-            'hora_entrada': hora_entrada,
-            'hora_salida': hora_salida,
-            'cruza_medianoche': bool(result[2]),
-            'horas_totales': 8.0,
-            'empleado_nombre': result[3] if len(result) > 3 else "Empleado",
-            'fuente': 'base_datos'
+def _crear_horario_por_defecto(employee_code=None):
+    """
+    Crear horario por defecto con 1 hora de descanso FIJO
+    """
+    # Empleados con horario de 9 horas
+    empleados_9_horas = ['1', '5', '6', '51', '52', '53', '57', '60', '62', '63', '78', '79', '87']
+    
+    if employee_code and str(employee_code) in empleados_9_horas:
+        horas_totales_dia = 9.0
+        horas_efectivas_dia = 8.0  # 9 - 1 descanso
+        entrada = '08:00'
+        salida = '18:00'
+        print(f"   ⚡ Horario 9h: {employee_code} → 9.0 horas/día (8.0 efectivas)")
+    else:
+        horas_totales_dia = 8.0
+        horas_efectivas_dia = 7.0  # 8 - 1 descanso
+        entrada = '08:00'
+        salida = '17:00'
+        print(f"   ⚡ Horario 8h: {employee_code} → 8.0 horas/día (7.0 efectivas)")
+    
+    # Crear estructura detallada
+    horarios_detallados = {}
+    dias_laborales = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes']
+    
+    for dia in dias_laborales:
+        horarios_detallados[dia] = {
+            'entrada': entrada,
+            'salida': salida,
+            'horas_totales': horas_totales_dia,
+            'horas_efectivas': horas_efectivas_dia,
+            'horas_descanso': 1.0,
+            'tiene_horario': True,
+            'es_laboral': True
         }
-        
-        print(f"   - ✅ Horario BD: {hora_entrada} - {hora_salida}")
-        return horario
-        
-    except Exception as e:
-        print(f"❌ Error formateando resultado: {e}")
-        return get_default_schedule()
-
-def get_default_schedule():
-    """Horario por defecto"""
-    print("   - 🔄 Usando horario por defecto")
+    
+    # Fines de semana sin horario
+    for dia in ['Sábado', 'Domingo']:
+        horarios_detallados[dia] = {
+            'entrada': '00:00',
+            'salida': '00:00',
+            'horas_totales': 0.0,
+            'horas_efectivas': 0.0,
+            'horas_descanso': 0.0,
+            'tiene_horario': False,
+            'es_laboral': False
+        }
+    
     return {
-        'hora_entrada': '08:00:00',
-        'hora_salida': '17:00:00', 
-        'cruza_medianoche': False,
-        'horas_totales': 8.0,
-        'empleado_nombre': 'No especificado',
-        'fuente': 'por_defecto'
+        'empleado_id': employee_code or 'default',
+        'empleado_nombre': f'Empleado {employee_code}' if employee_code else 'Empleado',
+        'horas_totales_semana': horas_totales_dia * 5,
+        'horas_efectivas_semana': horas_efectivas_dia * 5,
+        'horas_por_dia': horas_totales_dia,
+        'horas_efectivas_por_dia': horas_efectivas_dia,
+        'dias_con_horario': 5,
+        'dias_laborales': dias_laborales,
+        'horarios_detallados': horarios_detallados,
+        'fuente': 'default',
+        'configuracion': {
+            'descanso_fijo_horas': 1.0,
+            'tolerancia_retardo_minutos': 10,
+            'dias_laborales_semana': 5
+        }
     }
+
+def _formatear_resultado_horario_corregido(horario_dict: dict, employee_code: str):
+    """
+    VERSIÓN CORREGIDA - Siempre resta 1 hora de descanso
+    """
+    try:
+        nombre_completo = horario_dict.get('nombre_completo', f'Empleado {employee_code}')
+        dias_semana = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
+        
+        horas_totales_semana = 0.0
+        horas_efectivas_semana = 0.0
+        dias_con_horario = 0
+        horarios_detallados = {}
+
+        for dia in dias_semana:
+            entrada = horario_dict.get(f'{dia.lower()}_entrada')
+            salida = horario_dict.get(f'{dia.lower()}_salida')
+
+            if entrada and salida and entrada != '00:00:00':
+                try:
+                    from datetime import datetime
+                    entrada_dt = datetime.strptime(entrada, '%H:%M:%S')
+                    salida_dt = datetime.strptime(salida, '%H:%M:%S')
+
+                    # Calcular horas totales
+                    diferencia = salida_dt - entrada_dt
+                    horas_totales_dia = diferencia.total_seconds() / 3600
+
+                    # ✅ CORRECCIÓN: SIEMPRE RESTAR 1 HORA DE DESCANSO
+                    horas_efectivas_dia = horas_totales_dia - 1.0
+
+                    # Asegurar que no sea negativo
+                    if horas_efectivas_dia < 0:
+                        horas_efectivas_dia = 0
+
+                    horas_totales_semana += horas_totales_dia
+                    horas_efectivas_semana += horas_efectivas_dia
+                    dias_con_horario += 1
+
+                    horarios_detallados[dia] = {
+                        'entrada': entrada,
+                        'salida': salida,
+                        'horas_totales': round(horas_totales_dia, 2),
+                        'horas_efectivas': round(horas_efectivas_dia, 2),
+                        'horas_descanso': 1.0,
+                        'tiene_horario': True,
+                        'es_laboral': dia in ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes']
+                    }
+
+                    print(f"   - {dia}: {entrada}-{salida} → {horas_totales_dia:.1f}h total, {horas_efectivas_dia:.1f}h efectivas")
+
+                except Exception as e:
+                    print(f"   ⚠️ Error calculando horas para {dia}: {e}")
+                    # ✅ CORRECCIÓN: Valor por defecto con 1 hora descanso
+                    horas_totales_dia = 9.0 if employee_code in ['1','5','6','51','52','53','57','60','62','63','78','79','87'] else 8.0
+                    horas_efectivas_dia = horas_totales_dia - 1.0
+
+                    horas_totales_semana += horas_totales_dia
+                    horas_efectivas_semana += horas_efectivas_dia
+                    dias_con_horario += 1
+
+                    horarios_detallados[dia] = {
+                        'entrada': '08:00',
+                        'salida': '18:00' if horas_totales_dia == 9.0 else '17:00',
+                        'horas_totales': horas_totales_dia,
+                        'horas_efectivas': horas_efectivas_dia,
+                        'horas_descanso': 1.0,
+                        'tiene_horario': True,
+                        'es_laboral': dia in ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes']
+                    }
+            else:
+                # Día sin horario
+                horarios_detallados[dia] = {
+                    'entrada': '00:00',
+                    'salida': '00:00',
+                    'horas_totales': 0.0,
+                    'horas_efectivas': 0.0,
+                    'horas_descanso': 0.0,
+                    'tiene_horario': False,
+                    'es_laboral': dia in ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes']
+                }
+
+        # Calcular promedios
+        horas_por_dia = horas_totales_semana / dias_con_horario if dias_con_horario > 0 else 8.0
+        horas_efectivas_por_dia = horas_efectivas_semana / dias_con_horario if dias_con_horario > 0 else 7.0
+
+        dias_laborales = [dia for dia in dias_semana if horarios_detallados[dia]['tiene_horario'] and horarios_detallados[dia]['es_laboral']]
+
+        horario_completo = {
+            'empleado_id': employee_code,
+            'empleado_nombre': nombre_completo,
+            'horas_totales_semana': round(horas_totales_semana, 2),
+            'horas_efectivas_semana': round(horas_efectivas_semana, 2),
+            'horas_por_dia': round(horas_por_dia, 2),
+            'horas_efectivas_por_dia': round(horas_efectivas_por_dia, 2),
+            'dias_con_horario': dias_con_horario,
+            'dias_laborales': dias_laborales,
+            'horarios_detallados': horarios_detallados,
+            'fuente': 'base_datos',
+            'configuracion': {
+                'descanso_fijo_horas': 1.0,
+                'tolerancia_retardo_minutos': 10,
+                'dias_laborales_semana': 5
+            }
+        }
+
+        print(f"   📊 Resumen: {dias_con_horario} días, {horas_totales_semana:.1f}h totales, {horas_efectivas_semana:.1f}h efectivas")
+        return horario_completo
+
+    except Exception as e:
+        print(f"❌ Error formateando horario completo: {e}")
+        return _crear_horario_por_defecto(employee_code)
+
+def format_complete_schedule_result(horario_dict: dict, employee_code: str):
+    """
+    Alias para compatibilidad
+    """
+    return _formatear_resultado_horario_corregido(horario_dict, employee_code)

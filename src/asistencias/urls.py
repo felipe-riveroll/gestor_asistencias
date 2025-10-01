@@ -15,6 +15,7 @@ urlpatterns = [
     path("empleados/crear-horario/", views.crear_horario, name="crear_horario"),
     path("gestion_usuarios/", views.gestion_usuarios, name="gestion_usuarios"),
     path("lista_asistencias/", views.lista_asistencias, name="lista_asistencias"),
-    path("reporte_horas/", views.reporte_horas, name="reporte_horas"),
-    path("api/reporte_horas/", views.api_reporte_horas, name="reporte_horas_api"),
+    path('health/', views.health_check, name='health_check'),
+    path('api/reporte_horas/', views.api_reporte_horas, name='api_reporte_horas'),
+    path('reporte_horas/', views.reporte_horas, name='reporte_horas'),
 ]

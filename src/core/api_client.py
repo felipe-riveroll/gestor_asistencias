@@ -2,11 +2,13 @@
 API client module for fetching data from external services.
 Handles communication with Frappe API for check-ins and leave applications.
 """
+
 import json
 import requests
 import pytz
 from datetime import datetime, timedelta
 from typing import List, Dict, Any
+
 from .config import API_URL, LEAVE_API_URL, EMPLOYEE_API_URL, get_api_headers
 from .utils import normalize_leave_type
 
@@ -149,7 +151,7 @@ class APIClient:
         seen_ids = set()
         
         for record in all_records:
-            record_id = f"{record.get('employee')}{record.get('time')}{record.get('device_id')}"
+            record_id = f"{record.get('employee')}_{record.get('time')}_{record.get('device_id')}"
             if record_id not in seen_ids:
                 seen_ids.add(record_id)
                 unique_records.append(record)

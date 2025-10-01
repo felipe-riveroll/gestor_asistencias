@@ -40,14 +40,7 @@
             
             <button type="submit" class="login-button">Iniciar Sesión</button>
     </div>
-    <script type="module">
-    import { checkAuth, disableCache, logout } from '../js/auth.js';
-    document.addEventListener('DOMContentLoaded', () => {
-        disableCache();
-        if (!checkAuth()) return;
-    });
-    document.getElementById('logoutBtn')?.addEventListener('click', logout);
-    </script>
+    
     <script src="{% static 'js/iniciar_sesion.js' %}"></script>
 </body>
 </html>
