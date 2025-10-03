@@ -4,8 +4,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const closeButtons = document.querySelectorAll(".close");
   const btnAdd = document.getElementById("btnAdd");
   const btnCancel = document.querySelector(".btn-cancel");
-  const form = document.getElementById("employeeForm");
-  const btnImport = document.getElementById("btnImport");
+  const btnGuardar = document.getElementById("employeeForm");
+  const btnImport = document.getElementById("btnImport");   
   const btnExportExcel = document.getElementById("btnExportExcel");
   const btnExportPDF = document.getElementById("btnExportPDF");
 
@@ -66,29 +66,51 @@ document.addEventListener("DOMContentLoaded", () => {
     const horarioId = horarioSelect.value;
     const horarioText =
       horarioSelect.options[horarioSelect.selectedIndex]?.text;
-    const diasSeleccionados = Array.from(
+
+    // Obtener los checkboxes seleccionados
+    const checkboxes = Array.from(
       document.querySelectorAll(".day-checkbox:checked")
-    ).map((cb) => cb.dataset.id);
+    );
+
+    // Extraer IDs y nombres
+    const diasIds = checkboxes.map((cb) => cb.dataset.id);
+    const diasNombres = checkboxes.map(
+      (cb) => document.querySelector(`label[for="${cb.id}"]`).innerText
+    );
 
     // Validar
-    if (!sucursalId || !horarioId || diasSeleccionados === 0) {
+    if (!sucursalId || !horarioId || diasIds.length === 0) {
       alert("Debe seleccionar sucursal, horario y día(s)");
       return;
+    }
+
+    //Validar duplicados
+    const etiquetas = document.querySelectorAll(".schedule-label");
+    for (let etiqueta of etiquetas) {
+      const existingDias = etiqueta
+        .querySelector('input[name="dias[]"]')
+        .value.split(",");
+
+      // Si algún día seleccionado ya existe en otra etiqueta
+      if (diasIds.some((d) => existingDias.includes(d))) {
+        alert("⚠️ Uno o más días ya están asignados en otro horario.");
+        return;
+      }
     }
 
     // Crear etiqueta visual
     const div = document.createElement("div");
     div.classList.add("schedule-label");
     div.innerHTML = `
-  <span class="tag-sucursal">${sucursalText}</span>
-  <span class="tag-dia">${diasSeleccionados.join(", ")}</span>
-  <span class="tag-horas">${horarioText}</span>
-  <button type="button" class="delete-btn"><i class="fas fa-times"></i></button>
-  
-  <input type="hidden" name="sucursales[]" value="${sucursalId}">
-  <input type="hidden" name="horarios[]" value="${horarioId}">
-  <input type="hidden" name="dias[]" value="${diasSeleccionados.join(",")}">
-`;
+    <span class="tag-sucursal">${sucursalText}</span>
+    <span class="tag-dia">${diasNombres.join(", ")}</span>
+    <span class="tag-horas">${horarioText}</span>
+    <button type="button" class="delete-btn"><i class="fas fa-times"></i></button>
+
+    <input type="hidden" name="sucursales[]" value="${sucursalId}">
+    <input type="hidden" name="horarios[]" value="${horarioId}">
+    <input type="hidden" name="dias[]" value="${diasIds.join(",")}">
+  `;
 
     // Botón eliminar
     div.querySelector(".delete-btn").addEventListener("click", function () {
@@ -104,6 +126,19 @@ document.addEventListener("DOMContentLoaded", () => {
 
     horariosAgregados.appendChild(div);
   });
+
+  btnGuardar.addEventListener("submit", function (e) {
+      // Contar las etiquetas de horarios agregados
+      const horarios = document.querySelectorAll(".schedule-label");
+
+      if (horarios.length === 0) {
+        e.preventDefault(); // Evita que el formulario se envíe
+        alert(
+          "⚠️ Debe asignar un horario antes de guardar el empleado."
+        );
+        return false;
+      }
+    });
 
   // Cerrar modales
   closeButtons.forEach((btn) => {
@@ -136,5 +171,4 @@ document.addEventListener("DOMContentLoaded", () => {
   cancelAddSchedule.addEventListener("click", () => {
     scheduleModal.style.display = "none";
   });
-
 });

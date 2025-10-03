@@ -1,3 +1,4 @@
+from django.forms import ValidationError
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import  login
 from django.contrib.auth.decorators import login_required
@@ -60,18 +61,14 @@ def gestion_empleados(request):
 def crear_empleado(request):
     if request.method == "POST":
         # Imprimir todo el POST para debug
-        print("===== [DEBUG] request.POST =====")
         for key, value in request.POST.lists():
             print(f"{key}: {value}")
-        print("================================")
-
-        try:
-            # Pasamos directamente el POST al service
-            crear_empleado_service(request.POST)
-            messages.success(request, "Empleado creado correctamente.")
-        except Exception as e:
-            print("[ERROR en crear_empleado]:", str(e))
-            messages.error(request, f"Error al crear empleado: {e}")
+        try: 
+            # Pasamos directamente el POST al service 
+            empleado = crear_empleado_service(request.POST) 
+            messages.success(request, f"Empleado {empleado.nombre} creado correctamente.") 
+        except ValidationError as e: 
+            messages.error(request, str(e))
 
         # Redirige después del POST para evitar resubmit
         return redirect('admin-gestion-empleados')
@@ -87,7 +84,10 @@ def eliminar_empleado(request, empleado_id):
 @login_required
 def crear_horario(request):
     if request.method == "POST":
-        crear_horario_service(request.POST)
-        messages.success(request, "Horario creado correctamente")
-        return redirect("admin-gestion-empleados")  # ajusta a tu URL de lista
+        try:
+            crear_horario_service(request.POST)
+            messages.success(request, "Horario creado correctamente")
+        except ValidationError as e:
+            messages.error(request, str(e))
+        return redirect("admin-gestion-empleados")  # redirige igual
     return render(request, "admin-gestion-empleados")

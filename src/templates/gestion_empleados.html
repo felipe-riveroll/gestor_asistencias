@@ -161,15 +161,20 @@
             </tbody>
           </table>
         </div>
+        <!--Mensajes de Error-->
+        {% if messages %}
+        <div class="messages">
+          {% for message in messages %}
+          <div
+            class="alert 
+          {% if message.tags %}alert-{{ message.tags }}{% endif %}"
+          >
+            {{ message }}
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
       </div>
-
-      {% if messages %}
-      <div class="messages">
-        {% for message in messages %}
-        <div class="alert alert-{{ message.tags }}">{{ message }}</div>
-        {% endfor %}
-      </div>
-      {% endif %}
 
       <!-- BOTONES FLOTANTES -->
       <button id="btnAdd" class="floating-btn">
@@ -179,7 +184,7 @@
         <i class="fas fa-file-import"></i>
       </button>
 
-      <!-- MODAL AGREGAR/EDITAR EMPLEADO ------------------------------------------------------------------------------------------------------->
+      <!-- MODAL AGREGAR EMPLEADO ------------------------------------------------------------------------------------------------------->
       <div id="employeeModal" class="modal">
         <div class="modal-content">
           <span class="close">&times;</span>
@@ -201,6 +206,8 @@
                   type="text"
                   id="codigoFrappe"
                   name="codigoFrappe"
+                  pattern="^[0-9]+$"
+                  title="Solo números"
                   required
                 />
               </div>
@@ -210,12 +217,21 @@
                   type="text"
                   id="codigoChecador"
                   name="codigoChecador"
+                  pattern="^[0-9]+$"
+                  title="Solo números"
                   required
                 />
               </div>
               <div class="form-group">
                 <label for="nombre">Nombre*</label>
-                <input type="text" id="nombre" name="nombre" required />
+                <input
+                  type="text"
+                  id="nombre"
+                  name="nombre"
+                  pattern="^[A-Za-zÁÉÍÓÚáéíóúÑñ ]+$"
+                  title="Solo letras"
+                  required
+                />
               </div>
             </div>
 
@@ -226,6 +242,8 @@
                   type="text"
                   id="primerApellido"
                   name="primerApellido"
+                  pattern="^[A-Za-zÁÉÍÓÚáéíóúÑñ ]+$"
+                  title="Solo letras"
                   required
                 />
               </div>
@@ -235,6 +253,9 @@
                   type="text"
                   id="segundoApellido"
                   name="segundoApellido"
+                  pattern="^[A-Za-zÁÉÍÓÚáéíóúÑñ ]+$"
+                  title="Solo letras"
+                  required
                 />
               </div>
               <div class="form-group">
@@ -247,25 +268,67 @@
 
             <div class="schedule-container">
               <div class="day-selector">
-                <input type="checkbox" id="lunes" class="day-checkbox" data-id="1" value="Lunes"/>
+                <input
+                  type="checkbox"
+                  id="lunes"
+                  class="day-checkbox"
+                  data-id="1"
+                  value="Lunes"
+                />
                 <label for="lunes" class="day-label">Lunes</label>
 
-                <input type="checkbox" id="martes" class="day-checkbox" data-id="2" value="Martes"/>
+                <input
+                  type="checkbox"
+                  id="martes"
+                  class="day-checkbox"
+                  data-id="2"
+                  value="Martes"
+                />
                 <label for="martes" class="day-label">Martes</label>
 
-                <input type="checkbox" id="miercoles" class="day-checkbox" data-id="3" value="Miércoles"/>
+                <input
+                  type="checkbox"
+                  id="miercoles"
+                  class="day-checkbox"
+                  data-id="3"
+                  value="Miércoles"
+                />
                 <label for="miercoles" class="day-label">Miércoles</label>
 
-                <input type="checkbox" id="jueves" class="day-checkbox" data-id="4" value="Jueves"/>
+                <input
+                  type="checkbox"
+                  id="jueves"
+                  class="day-checkbox"
+                  data-id="4"
+                  value="Jueves"
+                />
                 <label for="jueves" class="day-label">Jueves</label>
 
-                <input type="checkbox" id="viernes" class="day-checkbox" data-id="5" value="Viernes"/>
+                <input
+                  type="checkbox"
+                  id="viernes"
+                  class="day-checkbox"
+                  data-id="5"
+                  value="Viernes"
+                />
                 <label for="viernes" class="day-label">Viernes</label>
 
-                <input type="checkbox" id="sabado" class="day-checkbox" data-id="6" value="Sábado"/>
+                <input
+                  type="checkbox"
+                  id="sabado"
+                  class="day-checkbox"
+                  data-id="6"
+                  value="Sábado"
+                />
                 <label for="sabado" class="day-label">Sábado</label>
 
-                <input type="checkbox" id="domingo" class="day-checkbox" data-id="7" value="Domingo"/>
+                <input
+                  type="checkbox"
+                  id="domingo"
+                  class="day-checkbox"
+                  data-id="7"
+                  value="Domingo"
+                />
                 <label for="domingo" class="day-label">Domingo</label>
               </div>
 
@@ -393,10 +456,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
-    <script>
-      // Inicializar jsPDF
-      const { jsPDF } = window.jspdf;
-    </script>
     <script
       src="https://kit.fontawesome.com/a076d05399.js"
       crossorigin="anonymous"
