@@ -18,6 +18,7 @@ class APIClient:
     
     def __init__(self):
         """Initialize API client with default configuration."""
+        
         self.checkin_url = API_URL
         self.leave_url = LEAVE_API_URL
         self.employee_url = EMPLOYEE_API_URL
@@ -151,7 +152,7 @@ class APIClient:
         seen_ids = set()
         
         for record in all_records:
-            record_id = f"{record.get('employee')}_{record.get('time')}_{record.get('device_id')}"
+            record_id = f"{record.get('employee')}{record.get('time')}{record.get('device_id')}"
             if record_id not in seen_ids:
                 seen_ids.add(record_id)
                 unique_records.append(record)

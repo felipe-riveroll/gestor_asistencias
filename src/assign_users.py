@@ -2,8 +2,8 @@ from django.contrib.auth.models import User, Group
 from core.models import Empleado
 
 # 1️⃣ Datos del nuevo usuario
-nombre_usuario = "odalys"  # nombre de usuario
-correo = "odalys@example.com"
+nombre_usuario = "elizabeth"  # nombre de usuario
+correo = "elizabeth@example.com"
 password = "12345678"
 
 # 2️⃣ Crear usuario en Django Auth
@@ -16,7 +16,7 @@ user = User.objects.create_user(
 # 3️⃣ Asignar como administrador (staff + superuser)
 user.is_staff = True
 user.save()
-grupo = Group.objects.get(name="Manager") 
+grupo = Group.objects.get(name="Admin") 
 user.groups.add(grupo)
 user.save()
 print ("Usuario creado con éxito")

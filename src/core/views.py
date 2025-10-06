@@ -1,20 +1,21 @@
+# Imports de Django
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_http_methods
 from django.contrib import messages
 from django.http import JsonResponse
-from .services import autenticar_usuario, crear_empleado_service, crear_horario_service,AttendanceProcessor, generar_reporte_asistencia
-from .models import Sucursal, Horario, Empleado, AsignacionHorario, DiaSemana, ResumenHorario
-from .api_client import APIClient
-from datetime import datetime, timedelta
-from django.db.models import Prefetch
-import traceback
+
+# Imports de librerías externas
 import pandas as pd
 import time
-import gc
-from .main import generar_reporte_completo
 
+# Imports de tus propios archivos de la aplicación
+from .services import autenticar_usuario, crear_empleado_service, crear_horario_service, generar_reporte_asistencia
+from .api_client import APIClient, procesar_permisos_empleados
+from .models import Sucursal, Horario, Empleado, AsignacionHorario, DiaSemana
+from .main import generar_reporte_completo
+ 
 
 def inicio(request):
     return render(request, 'login.html')
@@ -45,8 +46,6 @@ def login_view(request):
         return redirect("login")
     
     return render(request, "login.html")
-
-
 
 @login_required
 def admin_page(request):
@@ -108,123 +107,58 @@ def gestion_usuarios(request):
     return render(request, "gestion_usuarios.html")
 
 @login_required
-def lista_asistencias(request):  # ← NOMBRE CORREGIDO
+def lista_asistencias(request):  
     return render(request, "lista_asistencias.html")
 
-# Health check endpoint
+#Reporte de Horas
+@login_required
+def reporte_horas(request):
+    """Muestra la página principal para generar reportes."""
+    sucursales = Sucursal.objects.all()
+    return render(request, "reporte_horas.html", {"sucursales": sucursales})
+
 @require_http_methods(["GET"])
 def health_check(request):
-    """Endpoint para verificar el estado del servicio"""
-    try:
-        from django.db import connection
-        # Verificar base de datos
-        with connection.cursor() as cursor:
-            cursor.execute("SELECT 1")
-        
-        return JsonResponse({
-            'status': 'healthy',
-            'timestamp': time.time(),
-            'database': 'connected'
-        }, status=200)
-        
-    except Exception as e:
-        return JsonResponse({
-            'status': 'unhealthy',
-            'timestamp': time.time(),
-            'database': 'disconnected',
-            'error': str(e)
-        }, status=503)
+    """Endpoint para verificar el estado del servicio."""
+    return JsonResponse({'status': 'healthy'}, status=200)
 
-
-# Api reporte horas - VERSIÓN DEFINITIVA CORREGIDA
+# --- API PARA EL REPORTE (VERSIÓN FINAL) ---
 @login_required
-@require_http_methods(["GET", "POST"])
+@require_http_methods(["GET"])
 def api_reporte_horas(request):
     """
-    API para generar reporte de horas - VERSIÓN SIMPLIFICADA CON ORCHESTRATOR
+    API que recibe la petición, la pasa al orquestador en main.py y devuelve el resultado.
     """
     try:
-        print("=" * 60)
-        print("✅ API reporte_horas INICIADA - USANDO MAIN.PY")
-        print("=" * 60)
+        start_date = request.GET.get("startDate")
+        end_date = request.GET.get("endDate") 
+        sucursal = request.GET.get("sucursal", "Todas")
         
-        # SOPORTE PARA GET Y POST
-        if request.method == 'POST':
-            fecha_inicio = request.POST.get("startDate")
-            fecha_fin = request.POST.get("endDate")
-            sucursal = request.POST.get("sucursal", "Todas")
-            empleado = request.POST.get("empleado", "")
-        else:
-            fecha_inicio = request.GET.get("startDate")
-            fecha_fin = request.GET.get("endDate") 
-            sucursal = request.GET.get("sucursal", "Todas")
-            empleado = request.GET.get("empleado", "")
+        print(f"📋 Petición recibida para la sucursal: {sucursal}, Fechas: {start_date} a {end_date}")
 
-        print(f"📋 Parámetros recibidos:")
-        print(f"   - startDate: {fecha_inicio}")
-        print(f"   - endDate: {fecha_fin}") 
-        print(f"   - sucursal: {sucursal}")
-        print(f"   - empleado: {empleado}")
-
-        # Validación de parámetros
-        if not fecha_inicio or not fecha_fin:
+        if not start_date or not end_date:
             return JsonResponse({"error": "Debe proporcionar fecha de inicio y fin."}, status=400)
 
-        # Mapeo de sucursales a device filters
         device_map = {
-            "Todas": "%", 
-            "Villas": "Villas%", 
-            "31pte": "31pte%", 
-            "Nave": "Nave%", 
-            "RioBlanco": "RioBlanco%"
+            "Todas": "%", "Villas": "%villas%", "31pte": "%31pte%", 
+            "Nave": "%nave%", "RioBlanco": "%rioblanco%"
         }
         device_filter = device_map.get(sucursal, "%")
-        print(f"🔍 Device filter: {device_filter}")
 
-        # ✅ USAR LA FUNCIÓN DESDE MAIN.PY
-        print("🔄 Ejecutando main.generar_reporte_completo...")
+        # Llamada única al orquestador en main.py
         resultado = generar_reporte_completo(
-            start_date=fecha_inicio,
-            end_date=fecha_fin,
+            start_date=start_date,
+            end_date=end_date,
             sucursal=sucursal,
             device_filter=device_filter
         )
+        
+        if not resultado.get("success"):
+            return JsonResponse({"error": resultado.get("error", "Error desconocido")}, status=500)
 
-        if not resultado["success"]:
-            print(f"❌ Error de main.py: {resultado['error']}")
-            return JsonResponse({"error": resultado["error"]}, status=500)
-
-        print(f"✅ Main.py completado: {len(resultado['data'])} empleados procesados")
-
-        # Filtrar por empleado si se especificó
-        datos_filtrados = resultado["data"]
-        if empleado and empleado.strip():
-            original_count = len(datos_filtrados)
-            datos_filtrados = [
-                r for r in resultado["data"] 
-                if (empleado.lower() in r.get('Nombre', '').lower() or 
-                    empleado.lower() in r.get('employee', '').lower())
-            ]
-            print(f"🔍 Filtrado por empleado: {original_count} → {len(datos_filtrados)}")
-
-        return JsonResponse({
-            "data": datos_filtrados,
-            "metadata": {
-                "total_registros": len(datos_filtrados),
-                "rango_fechas": f"{fecha_inicio} a {fecha_fin}",
-                "sucursal": sucursal,
-                "empleado_filtrado": empleado if empleado else "Todos",
-                **resultado.get("metadata", {})
-            }
-        })
+        return JsonResponse(resultado)
 
     except Exception as e:
-        print("❌ ERROR GENERAL en api_reporte_horas:")
         import traceback
         traceback.print_exc()
         return JsonResponse({"error": f"Error interno del servidor: {str(e)}"}, status=500)
-
-# ✅ FUNCIÓN EXISTENTE PARA MOSTRAR TEMPLATE
-@login_required
-def reporte_horas(request):
-    return render(request, "reporte_horas.html")
