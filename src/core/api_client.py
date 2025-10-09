@@ -18,7 +18,6 @@ class APIClient:
     
     def __init__(self):
         """Initialize API client with default configuration."""
-        
         self.checkin_url = API_URL
         self.leave_url = LEAVE_API_URL
         self.employee_url = EMPLOYEE_API_URL

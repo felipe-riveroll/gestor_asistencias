@@ -185,7 +185,6 @@ class AttendanceProcessor:
 
         if any(d.day <= 15 for d in fechas_en_rango):
             print("   -> Obteniendo horarios para la primera quincena...")
-            # Llama una vez por empleado - esto es ineficiente pero funcional con el nuevo db_postgres
             horarios_q1 = {e: obtener_horario_empleado_completo(e, start_date.strftime('%Y-%m-%d')) for e in employees_to_fetch}
         
         if any(d.day > 15 for d in fechas_en_rango):
@@ -250,14 +249,16 @@ class AttendanceProcessor:
     def calcular_resumen_final(self, df: pd.DataFrame) -> pd.DataFrame:
         if df.empty: return pd.DataFrame()
         
-        df['horas_esperadas_brutas'] = df['horas_esperadas'] + df.get('horas_permiso', pd.Timedelta(0))
+        # Corrección: El cálculo de permisos NO debe modificar 'horas_esperadas'
+        # Hacemos una copia para el cálculo del resumen.
+        df['horas_esperadas_netas'] = df['horas_esperadas'] - df.get('horas_permiso', pd.Timedelta(0))
 
         agg_dict = {
-            'Nombre': 'first', 'Sucursal': 'first', 'duration': 'sum', 'horas_esperadas_brutas': 'sum',
+            'Nombre': 'first', 'Sucursal': 'first', 'duration': 'sum', 'horas_esperadas': 'sum',
             'horas_permiso': 'sum', 'horas_descanso': 'sum', 'falta': 'sum', 'retardo': 'sum', 'salida_anticipada': 'sum',
         }
         df_resumen = df.groupby('employee').agg(agg_dict).reset_index().rename(columns={
-            'duration': 'total_horas_trabajadas_td', 'horas_esperadas_brutas': 'total_horas_esperadas_td',
+            'duration': 'total_horas_trabajadas_td', 'horas_esperadas': 'total_horas_esperadas_td',
             'horas_permiso': 'total_horas_descontadas_permiso_td', 'horas_descanso': 'total_horas_descanso_td',
             'falta': 'total_faltas', 'retardo': 'total_retardos', 'salida_anticipada': 'total_salidas_anticipadas',
         })
