@@ -6,6 +6,7 @@ from django.contrib.auth import logout
 from .services import autenticar_usuario, crear_empleado_service, crear_horario_service
 from django.contrib import messages
 from .models import Sucursal, Horario, Empleado, AsignacionHorario
+from .services import asignar_rol_service
 
 def inicio(request):
     return render(request, 'login.html')
@@ -36,10 +37,15 @@ def login_view(request):
     
     return render(request, "login.html")
 
-
-
 @login_required
 def admin_page(request):
+    if request.method == "POST":
+        resultado = asignar_rol_service(request.POST)
+        if "error" in resultado:
+            messages.error(request, resultado["error"])
+        else:
+            messages.success(request, resultado["success"])
+        return redirect("admin_page")  # Redirige a la misma página o la que prefieras
     return render(request, "admin_inicio.html")
 
 @login_required

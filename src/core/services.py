@@ -1,8 +1,9 @@
 # Funcion para autenticar un usuario con Django Auth
 from django.contrib.auth import authenticate
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User, Group
 from .models import Empleado, AsignacionHorario, Sucursal, Horario
 from django.core.exceptions import ValidationError
+
 
 def autenticar_usuario(request, email, password):
     try:
@@ -12,16 +13,17 @@ def autenticar_usuario(request, email, password):
     except User.DoesNotExist:
         return None
 
+
 def crear_empleado_service(data):
     print("[DEBUG] POST crudo:", dict(data))
 
     # 1. Validar duplicados por código o email
     if Empleado.objects.filter(codigo_frappe=data.get("codigoFrappe")).exists():
         raise ValidationError("Ya existe un empleado con este código de frappe.")
-    
+
     if Empleado.objects.filter(codigo_checador=data.get("codigoChecador")).exists():
         raise ValidationError("Ya existe un empleado con este código de checador.")
-    
+
     if Empleado.objects.filter(email=data.get("email")).exists():
         raise ValidationError("Ya existe un empleado con este email.")
 
@@ -33,7 +35,7 @@ def crear_empleado_service(data):
         apellido_paterno=data.get("primerApellido"),
         apellido_materno=data.get("segundoApellido"),
         email=data.get("email"),
-        tiene_horario_asignado=True
+        tiene_horario_asignado=True,
     )
     print(f"[DEBUG] Empleado creado -> ID: {empleado.pk}, Nombre: {empleado.nombre}")
 
@@ -61,6 +63,7 @@ def crear_empleado_service(data):
             )
     return empleado
 
+
 def listar_empleados():
 
     empleados = Empleado.objects.select_related("empleado", "sucursal", "horario").all()
@@ -81,6 +84,7 @@ def listar_empleados():
         )
     return lista_empleados
 
+
 def crear_horario_service(data):
     hora_entrada = data.get("horaEntrada")
     hora_salida = data.get("horaSalida")
@@ -91,7 +95,7 @@ def crear_horario_service(data):
     if Horario.objects.filter(
         hora_entrada=hora_entrada,
         hora_salida=hora_salida,
-        cruza_medianoche=cruza_medianoche
+        cruza_medianoche=cruza_medianoche,
     ).exists():
         raise ValidationError("Ya existe un horario con la misma configuración.")
 
@@ -102,3 +106,56 @@ def crear_horario_service(data):
         cruza_medianoche=cruza_medianoche,
         descripcion_horario=descripcion,
     )
+
+def asignar_rol_service(data):
+    nombre = data.get("firstName")
+    apellido = data.get("firstLastName")
+    correo = data.get("email")
+    codigo_frappe = data.get("frappeCode")
+    print("[DEBUG] Codigo frappe recibido:", codigo_frappe)
+    rol = data.get("role")
+
+    # Validar existencia del empleado
+    try:
+        empleado = Empleado.objects.get(codigo_frappe=codigo_frappe)
+    except Empleado.DoesNotExist:
+        return {"error": "No existe un empleado con ese código Frappe."}
+
+    # Validar si ya tiene usuario vinculado
+    if empleado.user:
+        return {"error": "Este empleado ya tiene un usuario asignado."}
+
+    # Validar correo repetido
+    if User.objects.filter(email=correo).exists():
+        return {"error": "Este correo ya está registrado."}
+
+    # Crear usuario
+    username = correo.split("@")[0]
+    password = "12345678"  # puedes luego generar una aleatoria si prefieres
+
+    user = User.objects.create_user(
+        username=username,
+        email=correo,
+        password=password,
+        first_name=nombre,
+        last_name=apellido,
+    )
+
+    # Asignar grupo y permisos
+    if rol == "Admin":
+        user.is_staff = True
+        user.is_superuser = True
+        grupo, _ = Group.objects.get_or_create(name="Admin")
+    else:
+        user.is_staff = True
+        user.is_superuser = False
+        grupo, _ = Group.objects.get_or_create(name="Manager")
+
+    user.save()
+    user.groups.add(grupo)
+
+    # Vincular con el empleado
+    empleado.user = user
+    empleado.save()
+
+    return {"success": f"Usuario '{username}' creado y vinculado correctamente."}
