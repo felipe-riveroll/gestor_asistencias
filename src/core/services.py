@@ -58,7 +58,7 @@ def crear_empleado_service(data):
     for sucursal_id, horario_id, dias_str in zip(sucursales, horarios, dias):
         print(f"[DEBUG] Procesando sucursal={sucursal_id}, horario={horario_id}, dias={dias_str}")
 
-        try:   
+        try:  
             
             horario_obj = Horario.objects.get(pk=int(horario_id))
         except Horario.DoesNotExist:
@@ -67,7 +67,6 @@ def crear_empleado_service(data):
 
         print(f"[DEBUG] Horario -> Entrada: {horario_obj.hora_entrada}, "
               f"Salida: {horario_obj.hora_salida}, Cruza medianoche: {horario_obj.cruza_medianoche}")
-
 
         dias_list = dias_str.split(",")  # ej: "1,2,3"
         for dia in dias_list:
@@ -88,7 +87,6 @@ def crear_empleado_service(data):
             )
     return empleado
 
-
 def listar_empleados():
 
     empleados = Empleado.objects.select_related("empleado", "sucursal", "horario").all()
@@ -108,7 +106,6 @@ def listar_empleados():
             }
         )
     return lista_empleados
-
 
 def crear_horario_service(data):
     return Horario.objects.create(
@@ -164,10 +161,12 @@ class AttendanceProcessor:
         final_df["dia_semana"] = final_df["dia_obj"].dt.day_name()
         return final_df
 
+    # 🚨 FUNCIÓN CORREGIDA ESTRUCTURALMENTE 🚨
     def analizar_asistencia_con_horarios(self, df: pd.DataFrame, start_date_str: str, end_date_str: str) -> pd.DataFrame:
         if df.empty: return df
-        print("\n🔄 Analizando horarios (modo optimizado final)...")
+        print("\n🔄 Analizando horarios (MODIFICACIÓN ESTRUCTURAL FINAL)...")
         
+        # 1. Inicialización de columnas
         for col in ["horas_esperadas", "horario_entrada", "horario_salida", "Sucursal"]:
             if 'horas' in col: df[col] = pd.Timedelta(0)
             else: df[col] = None
@@ -176,25 +175,18 @@ class AttendanceProcessor:
         if len(employees_to_fetch) == 0: return df
         
         start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
-        end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
         
-        # Lógica para manejar múltiples quincenas
-        fechas_en_rango = pd.date_range(start=start_date, end=end_date)
-        horarios_q1 = {}
-        horarios_q2 = {}
-
-        if any(d.day <= 15 for d in fechas_en_rango):
-            print("   -> Obteniendo horarios para la primera quincena...")
-            horarios_q1 = {e: obtener_horario_empleado_completo(e, start_date.strftime('%Y-%m-%d')) for e in employees_to_fetch}
+        # 🟢 CORRECCIÓN CLAVE: Obtener el horario UNA SOLA VEZ para el rango completo.
+        # Esto soluciona los errores de suma de horas para todos los empleados.
+        print("   -> Obteniendo horarios para todo el periodo (simplificado)...")
+        horarios_periodo = {e: obtener_horario_empleado_completo(e, start_date.strftime('%Y-%m-%d')) for e in employees_to_fetch}
         
-        if any(d.day > 15 for d in fechas_en_rango):
-            print("   -> Obteniendo horarios para la segunda quincena...")
-            fecha_q2_ref = end_date if end_date.day > 15 else start_date.replace(day=16)
-            horarios_q2 = {e: obtener_horario_empleado_completo(e, fecha_q2_ref.strftime('%Y-%m-%d')) for e in employees_to_fetch}
-
+        # 2. Iteramos sobre todos los días y empleados en el DataFrame base
         for idx, row in df.iterrows():
-            horarios_a_usar = horarios_q1 if row['dia_obj'].day <= 15 else horarios_q2
-            horario_emp = horarios_a_usar.get(row['employee'])
+            # Usamos el horario obtenido del periodo completo, ignorando la lógica de quincenas
+            horario_emp = horarios_periodo.get(row['employee'])
+            
+            # Si no hay horario asignado o no tiene días con horario, continuamos
             if not horario_emp or horario_emp.get('dias_con_horario', 0) == 0: continue
             
             df.at[idx, 'Sucursal'] = horario_emp.get('sucursal', 'N/A')
@@ -202,7 +194,13 @@ class AttendanceProcessor:
             dia_horario = horario_emp.get('horarios_detallados', {}).get(dia_nombre, {})
             
             if dia_horario.get('tiene_horario'):
-                df.at[idx, 'horas_esperadas'] = timedelta(hours=dia_horario.get('horas_totales', 0))
+                horas_dia = dia_horario.get('horas_totales', 0)
+                
+                # CÓDIGO DE DIAGNÓSTICO (mantener para ver si la data es correcta)
+                if row['employee'] in ['1', '10', '12', '78'] and horas_dia == 0:
+                    print(f"🚨 ALERTA 🚨 Emp: {row['employee']}, Día: {row['dia']} no tiene horario asignado (Horas: {horas_dia})")
+                
+                df.at[idx, 'horas_esperadas'] = timedelta(hours=horas_dia)
                 df.at[idx, 'horario_entrada'] = dia_horario.get('entrada')
                 df.at[idx, 'horario_salida'] = dia_horario.get('salida')
         
@@ -253,15 +251,32 @@ class AttendanceProcessor:
         # Hacemos una copia para el cálculo del resumen.
         df['horas_esperadas_netas'] = df['horas_esperadas'] - df.get('horas_permiso', pd.Timedelta(0))
 
+        df['falta_justificada'] = df.apply(
+            lambda x: 1 if x['tiene_permiso'] and x['horas_permiso'] == x['horas_esperadas'] else 0,
+            axis=1
+        )
+        # Asumimos que un episodio de ausencia es igual a una falta
+        df['episodio_ausencia_diario'] = df['falta'] 
+        # ------------------------------------------------------------------
+
         agg_dict = {
             'Nombre': 'first', 'Sucursal': 'first', 'duration': 'sum', 'horas_esperadas': 'sum',
             'horas_permiso': 'sum', 'horas_descanso': 'sum', 'falta': 'sum', 'retardo': 'sum', 'salida_anticipada': 'sum',
+            'falta_justificada': 'sum', 'episodio_ausencia_diario': 'sum',
         }
         df_resumen = df.groupby('employee').agg(agg_dict).reset_index().rename(columns={
             'duration': 'total_horas_trabajadas_td', 'horas_esperadas': 'total_horas_esperadas_td',
             'horas_permiso': 'total_horas_descontadas_permiso_td', 'horas_descanso': 'total_horas_descanso_td',
-            'falta': 'total_faltas', 'retardo': 'total_retardos', 'salida_anticipada': 'total_salidas_anticipadas',
+            'falta': 'faltas_del_periodo', 
+            
+            # 2. Renombrar las demás (ya no hay conflicto)
+            'retardo': 'total_retardos', 
+            'salida_anticipada': 'total_salidas_anticipadas',
+            'falta_justificada': 'faltas_justificadas', 
+            'episodio_ausencia_diario': 'episodios_ausencia',
         })
+        
+        # NOTA: Se eliminó el código de inyección temporal de valores, la corrección estructural debe bastar.
         
         df_resumen['total_horas_td'] = df_resumen['total_horas_esperadas_td'] - df_resumen['total_horas_descontadas_permiso_td']
         df_resumen['diferencia_td'] = df_resumen['total_horas_trabajadas_td'] - df_resumen['total_horas_td']
@@ -270,10 +285,19 @@ class AttendanceProcessor:
             df_resumen[col.replace('_td', '')] = df_resumen[col].apply(td_to_str)
         
         df_resumen['diferencia_HHMMSS'] = df_resumen['diferencia_td'].apply(lambda x: f"-{td_to_str(abs(x))}" if x.total_seconds() < 0 else td_to_str(x))
-        
+        df_resumen['total_faltas'] = df_resumen['faltas_del_periodo'] 
+
+        # 🟢 CORRECCIÓN CLAVE: Forzar la conversión a número entero
+        df_resumen['total_retardos'] = df_resumen['total_retardos'].fillna(0).astype(int)
+        df_resumen['total_salidas_anticipadas'] = df_resumen['total_salidas_anticipadas'].fillna(0).astype(int)
+        # -------------------------------------------------------------
+
         return df_resumen[['employee', 'Nombre', 'Sucursal', 'total_horas_trabajadas', 'total_horas_esperadas', 
-                           'total_horas_descontadas_permiso', 'total_horas_descanso', 'total_horas',
-                           'diferencia_HHMMSS', 'total_faltas', 'total_retardos', 'total_salidas_anticipadas']]
+                            'total_horas_descontadas_permiso', 'total_horas_descanso', 'total_horas',
+                            'diferencia_HHMMSS', 'total_faltas', 'total_retardos', 'total_salidas_anticipadas',
+                            'faltas_del_periodo', 
+                            'faltas_justificadas', 
+                            'episodios_ausencia',]]
 
     def procesar_reporte_completo(self, checkin_data, permisos_dict, joining_dates_dict, start_date, end_date, employee_codes=None):
         df_detalle = self.process_checkins_to_dataframe(checkin_data, start_date, end_date, employee_codes)
