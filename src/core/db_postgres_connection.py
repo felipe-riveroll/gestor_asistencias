@@ -1,7 +1,7 @@
 """
 Conexión a BD PostgreSQL - VERSIÓN FINAL OPTIMIZADA Y SIMPLIFICADA
 """
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, time # Importar 'time' explícitamente
 from typing import Dict, List
 from django.db.models import Q, Case, When, IntegerField
 
@@ -70,11 +70,11 @@ def obtener_horario_empleado_completo(employee_code: str, fecha: str = None) -> 
 
 
 def _formatear_resultado_desde_python(horarios_detallados: dict, empleado: Empleado) -> Dict:
-    from datetime import time
+    # ❌ ELIMINADA línea "from datetime import time" innecesaria por la importación al inicio.
     horas_totales_semana = 0.0
     
     primera_asignacion = empleado.asignaciones.select_related('sucursal').first()
-    sucursal = primera_asignacion.sucursal.nombre_sucursal if primera_asignacion else "N/A"
+    sucursal = primera_asignacion.sucursal.nombre_sucursal if primera_asignacion and primera_asignacion.sucursal else "N/A" # Añadir chequeo de sucursal
 
     for dia, info in horarios_detallados.items():
         if info.get("tiene_horario"):
@@ -83,18 +83,28 @@ def _formatear_resultado_desde_python(horarios_detallados: dict, empleado: Emple
                 if not all([entrada, salida]): continue
 
                 dummy_date = datetime.min
-                entrada_dt = datetime.combine(dummy_date, entrada if isinstance(entrada, time) else datetime.strptime(str(entrada), '%H:%M:%S').time())
-                salida_dt = datetime.combine(dummy_date, salida if isinstance(salida, time) else datetime.strptime(str(salida), '%H:%M:%S').time())
+                # Conversión segura a datetime.time si no lo es
+                entrada_t = entrada if isinstance(entrada, time) else datetime.strptime(str(entrada), '%H:%M:%S').time()
+                salida_t = salida if isinstance(salida, time) else datetime.strptime(str(salida), '%H:%M:%S').time()
+                
+                entrada_dt = datetime.combine(dummy_date.date(), entrada_t)
+                salida_dt = datetime.combine(dummy_date.date(), salida_t)
 
-                if cruza:
-                    diferencia = (datetime.combine(dummy_date.date(), datetime.max.time()) - entrada_dt) + timedelta(seconds=1) + (salida_dt - datetime.combine(dummy_date.date(), datetime.min.time()))
+                # 🟢 CORRECCIÓN DE CÁLCULO PARA TURNOS NOCTURNOS
+                # Si cruza medianoche, sumamos 1 día a la hora de salida para la resta.
+                # También se añade la lógica de comparación de tiempo para más robustez.
+                if cruza or salida_dt < entrada_dt:
+                    diferencia = (salida_dt + timedelta(days=1)) - entrada_dt
                 else:
                     diferencia = salida_dt - entrada_dt
                 
                 horas_totales_dia = diferencia.total_seconds() / 3600.0
-                info["horas_totales"] = round(horas_totales_dia, 2)
+                horas_totales_dia = round(horas_totales_dia, 2) # Aplicamos redondeo
+                
+                info["horas_totales"] = horas_totales_dia
                 horas_totales_semana += horas_totales_dia
-            except Exception:
+            except Exception as e:
+                # print(f"Error calculando horas para {empleado.codigo_frappe} en {dia}: {e}") # Debug opcional
                 info["tiene_horario"] = False
 
     dias_con_horario = sum(1 for info in horarios_detallados.values() if info.get("tiene_horario"))

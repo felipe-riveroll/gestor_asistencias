@@ -299,18 +299,85 @@ class AttendanceProcessor:
                             'faltas_justificadas', 
                             'episodios_ausencia',]]
 
+    # Reemplaza la función existente en services.py
+
     def procesar_reporte_completo(self, checkin_data, permisos_dict, joining_dates_dict, start_date, end_date, employee_codes=None):
+        
+        # 1. Crear el DataFrame con TODAS las checadas (esto es importante)
+        df_checadas_original = pd.DataFrame(checkin_data) if checkin_data else pd.DataFrame()
+        
+        # --- AÑADE ESTE BLOQUE DE CÓDIGO AQUÍ ---
+        # Asegurarnos de que la columna 'dia' exista antes de usarla
+        if not df_checadas_original.empty and 'time' in df_checadas_original.columns:
+            df_checadas_original['time'] = pd.to_datetime(df_checadas_original['time'])
+            df_checadas_original['dia'] = df_checadas_original['time'].dt.date
+        # ---------------------------------------------
+
+        # 2. Procesamiento principal que resume las checadas (primera y última)
         df_detalle = self.process_checkins_to_dataframe(checkin_data, start_date, end_date, employee_codes)
-        if df_detalle.empty: return pd.DataFrame(), pd.DataFrame()
+        if df_detalle.empty: 
+            return pd.DataFrame(), pd.DataFrame()
         
         df_detalle = self.analizar_asistencia_con_horarios(df_detalle, start_date, end_date)
         df_detalle = self.aplicar_permisos_detallados(df_detalle, permisos_dict)
-        df_detalle = self.calcular_horas_descanso(df_detalle)
-        df_detalle = self.analizar_incidencias(df_detalle)
         
+        # 3. Calcular los descansos reales usando la nueva función y el DF original
+        df_descansos = self.calcular_descanso_real_detallado(df_checadas_original)
+        
+        # 4. Unir los descansos calculados al DataFrame detallado principal
+        if not df_descansos.empty:
+            # Asegurarnos que el tipo de 'dia' sea el mismo antes de unir
+            df_descansos['dia'] = pd.to_datetime(df_descansos['dia']).dt.date
+            df_detalle = pd.merge(df_detalle, df_descansos, on=['employee', 'dia'], how='left')
+            df_detalle['horas_descanso'] = df_detalle['horas_descanso'].fillna(pd.Timedelta(0))
+        else:
+            df_detalle['horas_descanso'] = pd.Timedelta(0)
+
+        df_detalle = self.analizar_incidencias(df_detalle)
         df_resumen = self.calcular_resumen_final(df_detalle)
         
         return df_detalle, df_resumen
+
+    # Añade esta NUEVA función dentro de la clase AttendanceProcessor en services.py
+
+    def calcular_descanso_real_detallado(self, df_checadas_completo: pd.DataFrame) -> pd.DataFrame:
+        """
+        Calcula la duración real del descanso basándose en todas las checadas del día.
+        Suma los intervalos entre la 2da-3ra, 4ta-5ta, etc.
+        """
+        if df_checadas_completo.empty or 'time' not in df_checadas_completo.columns:
+            return pd.DataFrame(columns=['employee', 'dia', 'horas_descanso'])
+
+        # Asegurarse de que 'time' sea datetime
+        df_checadas_completo['time'] = pd.to_datetime(df_checadas_completo['time'])
+
+        # Agrupar por empleado y día para procesar las checadas
+        grupos = df_checadas_completo.groupby(['employee', 'dia'])
+        
+        descansos_calculados = []
+
+        for (empleado, dia), grupo in grupos:
+            # Ordenar las checadas del día cronológicamente
+            checadas_ordenadas = grupo.sort_values('time')['time'].tolist()
+            
+            total_descanso_dia = timedelta(0)
+            
+            # Solo podemos calcular descansos si hay un número par y >= 4 checadas
+            if len(checadas_ordenadas) >= 4:
+                # Iterar sobre los pares de checadas que representan un descanso
+                # (Salida -> Entrada) -> (1, 2), (3, 4), etc. en índices de lista
+                for i in range(1, len(checadas_ordenadas) - 1, 2):
+                    salida_descanso = checadas_ordenadas[i]
+                    entrada_descanso = checadas_ordenadas[i+1]
+                    total_descanso_dia += (entrada_descanso - salida_descanso)
+            
+            descansos_calculados.append({
+                'employee': empleado,
+                'dia': dia,
+                'horas_descanso': total_descanso_dia
+            })
+
+        return pd.DataFrame(descansos_calculados)
 
 def generar_reporte_asistencia(checkin_data, permisos_dict, joining_dates_dict, start_date, end_date, employee_codes=None):
     processor = AttendanceProcessor()
