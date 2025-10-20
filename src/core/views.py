@@ -3,10 +3,9 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import  login
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import logout
-from .services import autenticar_usuario, crear_empleado_service, crear_horario_service
+from .services import autenticar_usuario, crear_empleado_service, crear_horario_service, obtener_roles_service
 from django.contrib import messages
-from .models import Sucursal, Horario, Empleado, AsignacionHorario
-from .services import asignar_rol_service
+from .models import Sucursal, Horario, Empleado
 
 def inicio(request):
     return render(request, 'login.html')
@@ -38,7 +37,8 @@ def login_view(request):
     return render(request, "login.html")
 
 @login_required
-def admin_page(request):
+def admin_page(request, empleado_id=None):
+    from core.services import asignar_rol_service, obtener_admin_por_id_service
     if request.method == "POST":
         resultado = asignar_rol_service(request.POST)
         if "error" in resultado:
@@ -46,7 +46,34 @@ def admin_page(request):
         else:
             messages.success(request, resultado["success"])
         return redirect("admin_page")  # Redirige a la misma página o la que prefieras
-    return render(request, "admin_inicio.html")
+    
+    # Obtener lista de administradores y managers
+    administradores = obtener_roles_service()
+
+    # Si venimos desde /editar/, obtener el admin a editar
+    admin_editar = None
+    if empleado_id:
+        admin_editar = obtener_admin_por_id_service(empleado_id)
+
+    return render(
+        request,
+        "admin_inicio.html",
+        {"administradores": administradores, "admin_editar": admin_editar},
+    )
+
+@login_required
+def eliminar_admin(request, empleado_id):
+    from core.services import eliminar_admin_service
+
+    resultado = eliminar_admin_service(empleado_id)
+
+    if "error" in resultado:
+        messages.error(request, resultado["error"])
+    else:
+        messages.success(request, resultado["success"])
+
+    return redirect("admin_page")
+
 
 @login_required
 def manager_page(request):
@@ -97,3 +124,5 @@ def crear_horario(request):
             messages.error(request, str(e))
         return redirect("admin-gestion-empleados")  # redirige igual
     return render(request, "admin-gestion-empleados")
+
+

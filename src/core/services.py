@@ -1,7 +1,7 @@
 # Funcion para autenticar un usuario con Django Auth
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User, Group
-from .models import Empleado, AsignacionHorario, Sucursal, Horario
+from .models import Empleado, AsignacionHorario, Horario
 from django.core.exceptions import ValidationError
 
 
@@ -108,12 +108,44 @@ def crear_horario_service(data):
     )
 
 def asignar_rol_service(data):
+    admin_id = data.get("adminId") 
     nombre = data.get("firstName")
     apellido = data.get("firstLastName")
     correo = data.get("email")
     codigo_frappe = data.get("frappeCode")
     print("[DEBUG] Codigo frappe recibido:", codigo_frappe)
     rol = data.get("role")
+
+    if admin_id:
+        # Modo edición
+        try:
+            empleado = Empleado.objects.select_related("user").get(pk=admin_id)
+        except Empleado.DoesNotExist:
+            return {"error": "Empleado no encontrado."}
+
+        user = empleado.user
+        if not user:
+            return {"error": "Este empleado no tiene usuario asociado."}
+
+        # Actualizar datos
+        user.first_name = nombre
+        user.last_name = apellido
+        user.email = correo
+        user.save()
+
+        # Actualizar grupo
+        user.groups.clear()
+        if rol == "Admin":
+            grupo, _ = Group.objects.get_or_create(name="Admin")
+            user.is_superuser = True
+        else:
+            grupo, _ = Group.objects.get_or_create(name="Manager")
+            user.is_superuser = False
+        user.is_staff = True
+        user.groups.add(grupo)
+        user.save()
+
+        return {"success": f"Administrador '{user.username}' actualizado correctamente."}
 
     # Validar existencia del empleado
     try:
@@ -159,3 +191,73 @@ def asignar_rol_service(data):
     empleado.save()
 
     return {"success": f"Usuario '{username}' creado y vinculado correctamente."}
+
+def obtener_roles_service():
+    # Filtra empleados que tienen usuario vinculado
+    empleados_con_usuario = (
+        Empleado.objects
+        .select_related("user")  # optimiza consultas
+        .filter(user__isnull=False)
+    )
+
+    resultado = []
+    for emp in empleados_con_usuario:
+        # Detectar rol del usuario (Admin o Manager)
+        grupos = emp.user.groups.values_list("name", flat=True)
+        rol = "Admin" if "Admin" in grupos else "Manager" if "Manager" in grupos else "—"
+
+        resultado.append({
+            "id": emp.empleado_id,
+            "nombre_completo": f"{emp.nombre} {emp.apellido_paterno or ''} {emp.apellido_materno or ''}".strip(),
+            "correo": emp.user.email,
+            "codigo_frappe": emp.codigo_frappe,
+            "rol": rol,
+        })
+
+    return resultado
+
+def obtener_admin_por_id_service(empleado_id):
+    try:
+        empleado = Empleado.objects.select_related("user").get(pk=empleado_id)
+        user = empleado.user
+
+        if not user:
+            return None
+
+        grupos = user.groups.values_list("name", flat=True)
+        rol = "Admin" if "Admin" in grupos else "Manager" if "Manager" in grupos else ""
+
+        return {
+            "empleado_id": empleado.empleado_id,
+            "firstName": empleado.nombre,
+            "firstLastName": empleado.apellido_paterno,
+            "email": user.email,
+            "frappeCode": empleado.codigo_frappe,
+            "role": rol,
+            "username": user.username,
+        }
+
+    except Empleado.DoesNotExist:
+        return None
+
+def eliminar_admin_service(empleado_id):
+    try:
+        empleado = Empleado.objects.select_related("user").get(pk=empleado_id)
+    except Empleado.DoesNotExist:
+        return {"error": "Empleado no encontrado."}
+
+    user = empleado.user
+    if not user:
+        return {"error": "Este empleado no tiene usuario asociado."}
+
+    # Guardamos nombre antes de borrar
+    username = user.username
+
+    # 1️⃣ Desvincular empleado
+    empleado.user = None
+    empleado.save()
+
+    # 2️⃣ Eliminar usuario de Django Auth
+    user.delete()
+
+    return {"success": f"El administrador '{username}' fue eliminado correctamente."}

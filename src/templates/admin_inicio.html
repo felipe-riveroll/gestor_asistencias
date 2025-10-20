@@ -16,6 +16,7 @@
     />
     <link rel="stylesheet" href="{% static 'css/admin_inicio.css' %}" />
     <link rel="stylesheet" href="{% static 'css/menu.css' %}" />
+    
   </head>
   <body>
     <div class="container">
@@ -125,16 +126,23 @@
             {% csrf_token %}
             <input type="hidden" id="adminId" />
             <div class="form-grid">
+              <input type="hidden" name="adminId" id="adminId" value="{{ admin_editar.empleado_id|default:'' }}" />
               <div class="input-group">
                 <label for="firstName">Nombre</label>
-                <input type="text" id="firstName" name="firstName" required />
+                <input type="text" id="firstName" name="firstName" value="{{ admin_editar.firstName|default:'' }}" required />
                 <div class="error-message" id="firstNameError">
                   Solo letras y espacios
                 </div>
               </div>
               <div class="input-group">
                 <label for="firstLastName">Primer apellido</label>
-                <input type="text" id="firstLastName" name="firstLastName" required />
+                <input
+                  type="text"
+                  id="firstLastName"
+                  name="firstLastName"
+                  value="{{ admin_editar.firstLastName|default:'' }}"
+                  required
+                />
                 <div class="error-message" id="firstLastNameError">
                   Solo letras y espacios
                 </div>
@@ -142,14 +150,21 @@
 
               <div class="input-group" style="grid-column: span 3">
                 <label for="email">Correo electrónico</label>
-                <input type="email" id="email" name="email" required />
+                <input type="email" id="email" name="email" value="{{ admin_editar.email|default:'' }}" required />
                 <div class="error-message" id="emailError">
                   Formato de correo inválido
                 </div>
               </div>
               <div class="input-group">
                 <label for="frappeCode">Código Frappe</label>
-                <input type="text" id="frappeCode" name="frappeCode" maxlength="4" required />
+                <input
+                  type="text"
+                  id="frappeCode"
+                  name="frappeCode"
+                  maxlength="4"
+                  value="{{ admin_editar.frappeCode|default:'' }}"
+                  required
+                />
                 <div class="error-message" id="frappeCodeError">
                   Solo se permiten de 1 a 4 números
                 </div>
@@ -161,8 +176,8 @@
                 <label for="role">Selecciona Rol</label>
                 <select id="role" name="role" required>
                   <option value="">Selecciona un rol</option>
-                  <option value="Manager">Manager</option>
-                  <option value="Admin">Administrador</option>
+                  <option value="Manager" {% if admin_editar.role == 'Manager' %}selected{% endif %}>Manager</option>
+                  <option value="Admin" {% if admin_editar.role == 'Admin' %}selected{% endif %}>Administrador</option>
                 </select>
               </div>
             </div>
@@ -192,7 +207,39 @@
               </tr>
             </thead>
             <tbody>
-              <!-- Datos se cargarán aquí -->
+              {% for admin in administradores %}
+              <tr>
+                <td>{{ admin.id }}</td>
+                <td>{{ admin.nombre_completo }}</td>
+                <td>{{ admin.correo }}</td>
+                <td>{{ admin.codigo_frappe }}</td>
+                <td>{{ admin.rol }}</td>
+                <td class="actions">
+                  <!-- Botón editar -->
+                  <a
+                    href="{% url 'editar_admin' admin.id %}"
+                    class="btn btn-success"
+                  >
+                    <i class="fas fa-edit"></i>
+                  </a>
+
+                  <!-- Botón eliminar -->
+                  <a
+                    href="{% url 'eliminar_admin' admin.id %}"
+                    class="btn btn-danger"
+                    onclick="return confirm('¿Estás seguro de que deseas eliminar este administrador?');"
+                  >
+                    <i class="fas fa-trash"></i>
+                  </a>
+                </td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td colspan="6" style="text-align: center">
+                  No hay administradores registrados
+                </td>
+              </tr>
+              {% endfor %}
             </tbody>
           </table>
         </div>
