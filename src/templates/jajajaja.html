@@ -14,8 +14,15 @@
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
-
-
+    <style>
+        .fila-falta { background-color: #ffcccc !important; } /* Rojo */
+        .fila-retardo-normal { background-color: #fff2cc !important; } /* Amarillo */
+        .fila-permiso { background-color: #d4edda !important; } /* Verde */
+        .fila-retardo-cumplido { background-color: #e6d4ed !important; } /* Morado Bajito */
+        .fila-descanso { background-color: #9b59b6 !important; color: white; } /* Morado Fuerte */
+        .fila-retardo-mayor { background-color: #ffd966 !important; } /* Naranja */
+        .fila-salida-anticipada { background-color: #f8cbad !important; } /* Rosa/Naranja claro */
+    </style>
 </head>
 <body>
     <div class="main-wrapper"> 
@@ -24,9 +31,9 @@
                 <h1>Recursos Humanos</h1>
             </div>
             <div class="user-menu">
-                <a href="{% url 'logout' %}" id="logoutBtn" class="user-btn" title="Cerrar sesión" aria-label="Cerrar sesión">
+              <a href="{% url 'logout' %}" id="logoutBtn" class="user-btn" title="Cerrar sesión" aria-label="Cerrar sesión">
                     <i class="fas fa-sign-out-alt"></i>
-                </a>
+              </a>
             </div>
         </header>
 
@@ -36,18 +43,25 @@
                     <h3 class="section-title">REPORTES</h3>
                     <ul>
                         <li class="menu-item">
-                            <a href="{% url 'reporte_horas' %}"><i class="fas fa-file-alt"></i><span>Reporte de Horas</span></a>
+                            <a href="{% url 'reporte_horas' %}">
+                                <i class="fas fa-file-alt"></i>
+                                <span>Reporte de Horas</span>
+                            </a>
                         </li>
                         <li class="menu-item">
-                            <a href="{% url 'lista_asistencias' %}"><i class="fas fa-user-check"></i><span>Reporte de Asistencias</span></a>
+                            <a href="{% url 'lista_asistencias' %}">
+                                <i class="fas fa-user-check"></i>
+                                <span>Reporte de Asistencias</span>
+                            </a>
                         </li>
                     </ul>
                 </div>
-                <div class="menu-section">
+            </nav>
+            <div class="menu-section">
                     <h3 class="section-title">PANEL DE GRÁFICAS</h3>
                     <ul class="main-menu">
                         <li class="menu-item">
-                            <a href="#">
+                            <a href="{% url 'grafica_general' %}">
                                 <i class="fas fa-globe"></i>
                                 <span>General</span>
                             </a>
@@ -91,24 +105,20 @@
                     <label for="fechaFin">Fecha Fin</label>
                     <input type="date" id="fechaFin" class="form-control">
                 </div>
-
                 <div class="filter-group">
                     <label for="sucursal">Sucursal</label>
                     <select id="sucursal" aria-required="true">
                         <option value="" disabled selected>Seleccione una sucursal</option>
-                        <option value="31pte">31 Poniente</option>
-                        <option value="villas">Villas</option>
-                        <option value="nave">Nave</option>
-                        <option value="rioblanco">Rio Blanco</option>
-                        <option value="all">Todas las Sucursales</option>
+                        <option value="Todas">Todas las Sucursales</option>
+                        {% for s in sucursales %}
+                            <option value="{{ s.nombre_sucursal }}">{{ s.nombre_sucursal }}</option>
+                        {% endfor %}
                     </select>
                 </div>
-
                 <div class="search-container">
                     <i class="fa-solid fa-magnifying-glass"></i>
                     <input type="text" id="buscarEmpleado" placeholder="Buscar empleado...">
                 </div>
-
                 <div class="btn-group export-buttons">
                     <button id="btnExcel" class="btn-excel"><i class="fa-solid fa-file-excel"></i> Excel</button>
                     <button id="btnCSV" class="btn-csv"><i class="fa-solid fa-file-csv"></i> CSV</button>
@@ -119,45 +129,29 @@
             <h2>Reporte de Checadas</h2>
 
             <nav class="tab" role="tablist">
-                <button class="tablinks active" id="tabDetalle" aria-selected="true" aria-controls="Detalle" role="tab">Detalle</button>
-                <button class="tablinks" id="tabRetardos" aria-selected="false" aria-controls="Retardos" role="tab">Retardos</button>
+                <button class="tablinks active" id="tabDetalle" aria-selected="true" role="tab">Detalle</button>
+                <button class="tablinks" id="tabRetardos" aria-selected="false" role="tab">Retardos</button>
             </nav>
 
-            <section id="Detalle" class="tabcontent active" role="tabpanel" aria-labelledby="tabDetalle">
+            <section id="Detalle" class="tabcontent active" role="tabpanel">
                 <table id="tablaDetalle">
-                    <thead>
-                        <tr>
-                            <th>ID Empleado</th>
-                            <th>Nombre</th>
-                            <th>Turno</th>
-                            <th>Fecha</th>
-                            <th>Día</th>
-                            <th>Horas Esperadas</th>
-                            <th>Horas Totales</th>
-                            <th>Checada 1</th>
-                            <th>Checada 2</th>
-                            <th>Checada 3</th>
-                            <th>Checada 4</th>
-                            <th>Checada 5</th>
-                            <th>Observaciones</th>
-                        </tr>
-                    </thead>
+                    <thead id="tablaDetalleHeader">
+                        </thead>
                     <tbody id="detalleBody"></tbody>
                 </table>
             </section>
 
-            <section id="Retardos" class="tabcontent" role="tabpanel" aria-labelledby="tabRetardos" hidden>
+            <section id="Retardos" class="tabcontent" role="tabpanel" style="display: none;">
                 <table id="tablaRetardos">
                     <thead>
                         <tr>
                             <th>ID Empleado</th>
                             <th>Nombre</th>
-                            <th>Turno</th>
+                            <th>Sucursal</th>
                             <th>Fecha</th>
                             <th>Día</th>
                             <th>Hora Esperada</th>
                             <th>Hora Real</th>
-                            <th>Retardo</th>
                             <th>Observaciones</th>
                         </tr>
                     </thead>
@@ -166,10 +160,6 @@
             </section>
         </main>
     </div>
-
-    <script>
-      // ... tu script de logout ...
-    </script>
     <script src="{% static 'js/lista_asistencias.js' %}"></script>
 </body>
 </html>

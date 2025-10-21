@@ -36,7 +36,7 @@ class AttendanceReportManager:
             empleados = Empleado.objects.all()
         else:
             empleados = Empleado.objects.filter(
-                asignaciones_sucursal_nombre_sucursal=sucursal
+                asignaciones__sucursal__nombre_sucursal=sucursal
             ).distinct()
             
         codigos_empleados = [str(emp.codigo_frappe) for emp in empleados if emp.codigo_frappe]

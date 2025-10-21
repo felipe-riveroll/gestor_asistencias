@@ -53,7 +53,8 @@ def admin_page(request):
 
 @login_required
 def manager_page(request):
-    return render(request, "manager_inicio.html")
+    sucursales = Sucursal.objects.all()
+    return render(request, "reporte_horas.html", {"sucursales": sucursales})
 
 @login_required
 def gestion_empleados(request):
@@ -162,3 +163,4 @@ def api_reporte_horas(request):
         import traceback
         traceback.print_exc()
         return JsonResponse({"error": f"Error interno del servidor: {str(e)}"}, status=500)
+
