@@ -3,7 +3,10 @@ from django.contrib.auth import authenticate
 from django.contrib.auth.models import User, Group
 from .models import Empleado, AsignacionHorario, Horario
 from django.core.exceptions import ValidationError
-
+import secrets
+import string
+from django.core.mail import send_mail
+from django.conf import settings
 
 def autenticar_usuario(request, email, password):
     try:
@@ -163,7 +166,8 @@ def asignar_rol_service(data):
 
     # Crear usuario
     username = correo.split("@")[0]
-    password = "12345678"  # puedes luego generar una aleatoria si prefieres
+    alphabet = string.ascii_letters + string.digits
+    password = ''.join(secrets.choice(alphabet) for i in range(12)) # Creamos una contraseña de 12 caracteres
 
     user = User.objects.create_user(
         username=username,
@@ -189,6 +193,25 @@ def asignar_rol_service(data):
     # Vincular con el empleado
     empleado.user = user
     empleado.save()
+
+    # Enviar correo con las credenciales
+    asunto = "Credenciales de acceso al sistema"
+    mensaje = (
+        f"Hola {nombre},\n\n"
+        f"Se te ha creado un usuario en el sistema.\n\n"
+        f"Usuario: {correo}\n"
+        f"Contraseña: {password}\n\n"
+        f"Por favor, ingresa con el correo y contraseña que se te asigno.\n\n"
+        f"Saludos."
+    )
+
+    send_mail(
+        asunto,
+        mensaje,
+        settings.DEFAULT_FROM_EMAIL,
+        [correo],
+        fail_silently=False,
+    )
 
     return {"success": f"Usuario '{username}' creado y vinculado correctamente."}
 
