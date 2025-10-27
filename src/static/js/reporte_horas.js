@@ -1,3 +1,18 @@
+// --- FUNCIÓN DE AYUDA PARA EL TOKEN DE DJANGO ---
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
 document.addEventListener("DOMContentLoaded", () => {
     // --- Referencias a los elementos de TU HTML ---
     const startDateInput = document.getElementById("startDate");
@@ -110,21 +125,102 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     /**
-     * Exporta los datos de la tabla a un archivo Excel.
+     * Exporta los datos de la tabla a un archivo Excel llamando al backend.
      */
-    function downloadExcel() {
-        // 🟢 MEJORA (QoL): Se agrega una comprobación más robusta para la tabla.
-        const tabla = document.getElementById('reporteTable');
-        if (typeof XLSX === 'undefined' || !tabla) {
-            return alert("La librería para exportar a Excel no está disponible o la tabla no existe.");
-        }
+    async function downloadExcel() {
+        console.log("Iniciando exportación con el método del backend...");
         
-        const wb = XLSX.utils.table_to_book(tabla, { sheet: "Reporte" });
-        // 🟢 CORRECCIÓN 5: Uso de sintaxis correcta para template literal en el nombre del archivo.
-        const fileName = `Reporte_${startDateInput.value}_a_${endDateInput.value}.xlsx`; 
-        XLSX.writeFile(wb, fileName);
-    }
+        // 1. Obtener los encabezados (Headers) desde la tabla HTML
+        const headers = Array.from(document.querySelectorAll("#reporteTable thead th"))
+                             .map(th => th.innerText.trim());
+        
+        if (headers.length === 0) {
+             alert("Error: No se pudieron encontrar los encabezados de la tabla.");
+             return;
+        }
 
+        // 2. Obtener los datos (usamos los datos ya filtrados por el buscador)
+        const textoBusqueda = empleadoInput.value.toLowerCase().trim();
+        const datosParaExportar = datosCompletosDelReporte.filter(empleado => {
+             if (!textoBusqueda) return true; // Si no hay búsqueda, incluir todos
+             const nombre = (empleado.Nombre || '').toLowerCase();
+             const id = (empleado.employee || '').toString().toLowerCase(); 
+             return nombre.includes(textoBusqueda) || id.includes(textoBusqueda);
+        });
+
+        // 3. Convertir los datos (array de objetos) a (array de arrays)
+        // El orden debe ser el mismo que en tu función renderizarTabla
+        const dataRows = datosParaExportar.map(d => [
+            d.employee || '',
+            d.Nombre || 'Sin nombre',
+            d.total_horas_trabajadas || '00:00:00',
+            d.total_horas_esperadas || '00:00:00',
+            d.total_horas_descontadas_permiso || '00:00:00',
+            d.total_horas_descanso || '00:00:00',
+            d.total_horas || '00:00:00',
+            d.total_retardos || 0,
+            d.faltas_del_periodo || 0,
+            d.faltas_justificadas || 0,
+            d.total_faltas || 0,
+            d.episodios_ausencia || 0,
+            d.total_salidas_anticipadas || 0,
+            d.diferencia_HHMMSS || '00:00:00'
+        ]);
+
+        // 4. Construir el objeto JSON para enviar a Django
+        const nombreDelArchivo = `Reporte_Horas_${startDateInput.value}_a_${endDateInput.value}`;
+        const exportData = {
+            nombre_archivo: nombreDelArchivo,
+            sheets: {
+                "Reporte": {
+                    "datos": [headers, ...dataRows], // Unimos los headers + las filas de datos
+                    "colores": [] // Este reporte no tiene colores de fila, mandamos un array vacío
+                }
+            }
+        };
+
+        // 5. Hacer la petición POST al backend (¡aquí está la magia!)
+        try {
+            // Deshabilitar el botón para evitar doble clic
+            downloadBtn.innerText = "Descargando";
+            downloadBtn.disabled = true;
+
+            const response = await fetch('/api/exportar_excel_con_colores/', { // Esta es la URL de tu vista
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken') // <-- ¡MUY IMPORTANTE para Django!
+                },
+                body: JSON.stringify(exportData)
+            });
+
+            if (!response.ok) {
+                // Si el backend da un error, lo mostramos
+                const err = await response.json();
+                throw new Error(err.error || 'Error al generar el archivo en el servidor');
+            }
+
+            // 6. Descargar el archivo que nos manda el backend
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = `${nombreDelArchivo}.xlsx`; // El nombre del archivo
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            a.remove();
+
+        } catch (err) {
+            console.error("Error en la exportación del backend:", err);
+            alert(`Error al exportar: ${err.message}`);
+        } finally {
+            // Volver a habilitar el botón
+            downloadBtn.innerHTML = '<i class="fas fa-file-excel"></i> Descargar Excel';
+            downloadBtn.disabled = false;
+        }
+    }
     // --- ASIGNACIÓN DE EVENTOS ---
     startDateInput.addEventListener("change", cargarReporte);
     endDateInput.addEventListener("change", cargarReporte);

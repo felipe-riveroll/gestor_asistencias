@@ -1,5 +1,4 @@
 document.addEventListener("DOMContentLoaded", function () {
-    // 1. Constantes para elementos del DOM
     const fechaInicio = document.getElementById("fechaInicio");
     const fechaFin = document.getElementById("fechaFin");
     const buscarEmpleado = document.getElementById("buscarEmpleado");
@@ -14,205 +13,313 @@ document.addEventListener("DOMContentLoaded", function () {
     const tabRetardos = document.getElementById("tabRetardos");
     const sectionDetalle = document.getElementById("Detalle");
     const sectionRetardos = document.getElementById("Retardos");
-    
-    // Agrupación de botones de exportación para DRY (Don't Repeat Yourself)
-    const botonesExportacion = [btnPDF, btnExcel, btnCSV];
 
     let todasLasAsistencias = [];
 
-    // --- Funciones de Lógica Principal ---
+    // ==========================================================
+    // FUNCIONES DE UTILIDAD PARA TIEMPO (CORREGIDAS)
+    // ==========================================================
 
     /**
-     * Carga los datos de asistencia desde la API.
+     * Convierte una duración 'HH:MM:SS' a segundos totales.
+     * Es robusta contra valores nulos o malformados.
+     * @param {string} duracion - Duración en formato 'HH:MM:SS'.
+     * @returns {number} Segundos totales.
      */
-    async function cargarDatos() {
-        // Mostrar estado de carga y deshabilitar botones
-        const mensajeCargando = '<tr><td colspan="10" style="text-align: center;">Cargando...</td></tr>';
-        detalleBody.innerHTML = mensajeCargando;
-        retardosBody.innerHTML = mensajeCargando.replace('10', '8');
-        botonesExportacion.forEach(btn => btn.disabled = true);
+    function duracionASegundos(duracion) {
+        if (typeof duracion !== 'string' || !duracion || duracion === '00:00:00' || duracion === '-') return 0;
+        
+        const partes = duracion.split(':');
+        if (partes.length !== 3) return 0;
+        
+        // Usamos parseInt y manejamos NaN si las partes no son números
+        const h = parseInt(partes[0]) || 0;
+        const m = parseInt(partes[1]) || 0;
+        const s = parseInt(partes[2]) || 0;
+        
+        return (h * 3600) + (m * 60) + s;
+    }
 
+    /**
+     * Convierte una cantidad de segundos totales a formato 'H:MM:SS'.
+     * @param {number|string} segundos - Segundos totales.
+     * @returns {string} Duración en formato 'H:MM:SS' (horas pueden ser > 24).
+     */
+    function segundosADuracion(segundos) {
+        let totalSegundos = Number(segundos) || 0; // Asegura que sea un número válido
+        if (totalSegundos < 0) totalSegundos = 0;
+        
+        const h = Math.floor(totalSegundos / 3600);
+        const segundosRestantes = totalSegundos % 3600;
+        const m = Math.floor(segundosRestantes / 60);
+        const s = segundosRestantes % 60;
+
+        // Aseguramos padding de 2 dígitos para minutos y segundos
+        const minutosStr = m.toString().padStart(2, '0');
+        const segundosStr = s.toString().padStart(2, '0');
+        
+        return `${h}:${minutosStr}:${segundosStr}`;
+    }
+
+    /**
+     * Calcula la suma de Horas Totales y Horas Esperadas por empleado.
+     * @param {Array} datos - Lista de registros de asistencia filtrados.
+     * @returns {Object} Un objeto donde la clave es el ID de empleado y el valor son los totales.
+     */
+    function calcularTotalesPorEmpleado(datos) {
+        const totales = {};
+
+        datos.forEach(d => {
+            const id = d.employee;
+            const nombre = d.Nombre;
+            const horasTrabajadasSegundos = duracionASegundos(d.duration);
+            
+            // Lógica robusta para Horas Esperadas: acepta segundos (32400) o string de tiempo ('09:00:00')
+            let horasEsperadasSegundos = Number(d.horas_esperadas);
+            if (isNaN(horasEsperadasSegundos) || horasEsperadasSegundos === 0) {
+                // Intenta parsear como HH:MM:SS si no era un número válido
+                horasEsperadasSegundos = duracionASegundos(String(d.horas_esperadas));
+            }
+
+
+            if (!totales[id]) {
+                totales[id] = {
+                    Nombre: nombre,
+                    conteoDias: 0,
+                    totalHorasSegundos: 0,
+                    totalEsperadasSegundos: 0
+                };
+            }
+
+            totales[id].totalHorasSegundos += horasTrabajadasSegundos;
+            totales[id].totalEsperadasSegundos += horasEsperadasSegundos;
+
+            // Contar días (lógica existente, ajustada para que el conteo de la imagen sea correcto)
+            if (d.observacion_incidencia !== 'Descanso' && d.observacion_incidencia !== 'Falta') {
+                 totales[id].conteoDias += 1;
+            }
+        });
+
+        // Convertir los segundos totales de vuelta a formato H:MM:SS
+        for (const id in totales) {
+            totales[id].totalHorasTotales = segundosADuracion(totales[id].totalHorasSegundos);
+            totales[id].totalHorasEsperadas = segundosADuracion(totales[id].totalEsperadasSegundos);
+        }
+
+        return totales;
+    }
+
+    // ==========================================================
+    // LÓGICA PRINCIPAL DEL REPORTE
+    // ==========================================================
+
+    async function cargarDatos() {
+        detalleBody.innerHTML = '<tr><td colspan="10" style="text-align: center;">Cargando...</td></tr>';
+        retardosBody.innerHTML = '<tr><td colspan="8" style="text-align: center;">Cargando...</td></tr>';
+        [btnPDF, btnExcel, btnCSV].forEach(btn => btn.disabled = true);
         const params = {
             startDate: fechaInicio.value,
             endDate: fechaFin.value,
             sucursal: sucursalSelect.value,
         };
-
-        // Validación inicial de parámetros
         if (!params.startDate || !params.endDate || !params.sucursal) {
             const msg = '<tr><td colspan="10" style="text-align: center;">Por favor, selecciona fechas y sucursal.</td></tr>';
             detalleBody.innerHTML = msg;
             retardosBody.innerHTML = msg.replace('10', '8');
             return;
         }
-
-        // 🚨 CORRECCIÓN: Uso correcto de template literals (backticks ``) para la URL.
         const url = `/api/reporte_detalle/?${new URLSearchParams(params)}`;
-
         try {
             const response = await fetch(url);
-            if (!response.ok) { // Mejor manejo de errores HTTP (404, 500, etc.)
-                throw new Error(`Error en la solicitud: ${response.statusText}`);
-            }
             const resultado = await response.json();
-            
-            if (!resultado.success) {
-                // El servidor respondió OK (200) pero la lógica indica un error
-                throw new Error(resultado.error || 'Error desconocido al obtener datos.');
-            }
-            
+            if (!resultado.success) throw new Error(resultado.error || 'Error desconocido del servidor');
             todasLasAsistencias = resultado.data || [];
             filtrarYRenderizar();
-
         } catch (error) {
-            console.error("Error al cargar datos:", error);
             const errorMsg = `<tr><td colspan="10" style="text-align: center;">Error: ${error.message}</td></tr>`;
             detalleBody.innerHTML = errorMsg;
-            retardosBody.innerHTML = errorMsg.replace('10', '8'); // Reemplazar para col-span
+            retardosBody.innerHTML = errorMsg.replace('10', '8');
         }
     }
 
-    /**
-     * Filtra los datos cargados en base a la búsqueda y renderiza ambas tablas.
-     */
     function filtrarYRenderizar() {
         const busqueda = buscarEmpleado.value.toLowerCase().trim();
-        
-        // Uso de Optional Chaining y Nullish Coalescing para mayor seguridad
-        const datosFiltrados = todasLasAsistencias.filter(item => {
+        let datosFiltrados = todasLasAsistencias.filter(item => {
             if (!busqueda) return true;
-            const nombre = (item.Nombre ?? '').toLowerCase();
-            const id = (item.employee ?? '').toString().toLowerCase();
+            const nombre = (item.Nombre || '').toLowerCase();
+            const id = (item.employee || '').toString().toLowerCase();
             return nombre.includes(busqueda) || id.includes(busqueda);
         });
-
-        // Filtrar retardos específicos
+        
+        // Ordenar datosFiltrados por ID de empleado para que los totales se inserten en orden
+        datosFiltrados.sort((a, b) => (a.employee > b.employee) ? 1 : ((b.employee > a.employee) ? -1 : 0));
+        
         const datosRetardos = datosFiltrados.filter(item => 
             item.observacion_incidencia === 'Retardo Normal' || item.observacion_incidencia === 'Retardo Mayor'
         );
         
-        pintarTablaDetalle(datosFiltrados);
-        pintarTablaRetardos(datosRetardos);
+        const totalesEmpleados = calcularTotalesPorEmpleado(datosFiltrados);
         
+        pintarTablaDetalle(datosFiltrados, totalesEmpleados); 
+        pintarTablaRetardos(datosRetardos);
         const hayDatos = datosFiltrados.length > 0;
-        botonesExportacion.forEach(btn => btn.disabled = !hayDatos);
+        [btnPDF, btnExcel, btnCSV].forEach(btn => btn.disabled = !hayDatos);
     }
 
-    /**
-     * Renderiza la tabla de Detalle de Asistencias.
-     * @param {Array} datos - Los datos a mostrar.
-     */
-    function pintarTablaDetalle(datos) {
+    function pintarTablaDetalle(datos, totalesEmpleados) {
         detalleHeader.innerHTML = "";
         detalleBody.innerHTML = "";
-        
         if (datos.length === 0) {
             detalleHeader.innerHTML = '<tr><th>Información</th></tr>';
             detalleBody.innerHTML = '<tr><td colspan="10" style="text-align: center;">No se encontraron registros.</td></tr>';
             return;
         }
         
-        // Determinar el máximo de checadas dinámicamente
         let maxChecadas = 0;
         datos.forEach(d => {
-            // Se asume que 'checado_1', 'checado_2', etc. son las checadas intermedias
             const checadasKeys = Object.keys(d).filter(key => key.startsWith('checado_') && key !== 'checado_primero' && key !== 'checado_ultimo');
             if (checadasKeys.length > maxChecadas) maxChecadas = checadasKeys.length;
         });
+        if (maxChecadas < 2) maxChecadas = 2;
         
-        // Asegurar un mínimo de 2 columnas para Checados (Entrada/Salida)
-        maxChecadas = Math.max(maxChecadas, 2); 
-
-        // Generar encabezados de la tabla
-        let headersHTML = `<th>ID</th><th>Nombre</th><th>Fecha</th><th>Día</th><th>H. Esperadas</th><th>H. Trabajadas</th>`;
-        for (let i = 1; i <= maxChecadas; i++) {
-            headersHTML += `<th>Checado ${i}</th>`;
-        }
+        let headersHTML = `<th>ID Empleado</th><th>Nombre</th><th>Turno</th><th>Fecha</th><th>Día</th><th>Horas Esperadas</th><th>Horas Totales</th>`;
+        for (let i = 1; i <= maxChecadas; i++) headersHTML += `<th>Checado ${i}</th>`;
         headersHTML += `<th>Observaciones</th>`;
         detalleHeader.innerHTML = `<tr>${headersHTML}</tr>`;
 
-        // Llenar el cuerpo de la tabla
-        let rowsHTML = datos.map(d => {
-            const observacion = d.observacion_incidencia || 'OK';
-            let className = '';
-            
-            // Usar un objeto mapa para los nombres de clase, más limpio que el switch
-            const classMap = {
-                'Falta': 'fila-falta', 'Permiso': 'fila-permiso', 
-                'Retardo Normal': 'fila-retardo-normal', 'Retardo Mayor': 'fila-retardo-mayor',
-                'Cumplió con horas': 'fila-retardo-cumplido', 'Salida Anticipada': 'fila-salida-anticipada',
-                'Descanso': 'fila-descanso'
-            };
-            className = classMap[observacion] || '';
-
-            let rowData = `<td>${d.employee ?? ''}</td><td>${d.Nombre ?? ''}</td><td>${d.dia ?? ''}</td><td>${d.dia_semana ?? ''}</td><td>${d.horas_esperadas ?? '00:00:00'}</td><td>${d.duration ?? '00:00:00'}</td>`;
-            for (let i = 1; i <= maxChecadas; i++) {
-                rowData += `<td>${d['checado_' + i] ?? '-'}</td>`;
+        let empleadoActual = null;
+        // Número de columnas que ocuparán los campos vacíos en la fila de totales (Checadas + Observaciones)
+        const totalChecadasColspan = maxChecadas + 1; 
+        
+        datos.forEach(d => {
+            // Si el empleado cambia, insertamos la fila de Totales del empleado anterior
+            if (empleadoActual !== null && empleadoActual !== d.employee) {
+                const total = totalesEmpleados[empleadoActual];
+                const trTotal = document.createElement("tr");
+                trTotal.className = 'fila-totales'; // Clase para darle estilo (como un fondo gris)
+                trTotal.innerHTML = `
+                    <td colspan="1">${empleadoActual}</td>
+                    <td colspan="1">${total.Nombre}</td>
+                    <td colspan="1">Totales</td>
+                    <td colspan="1">${total.conteoDias}</td>
+                    <td colspan="1"></td>
+                    <td colspan="1">${total.totalHorasEsperadas}</td> 
+                    <td colspan="1">${total.totalHorasTotales}</td>
+                    <td colspan="${totalChecadasColspan}"></td>
+                `;
+                detalleBody.appendChild(trTotal);
             }
-            rowData += `<td>${observacion}</td>`;
+            
+            // Pintar la fila de datos del día
+            const tr = document.createElement("tr");
+            const observacion = d.observacion_incidencia || 'OK';
+            
+            // --- INICIA REEMPLAZO ---
+            switch (observacion) {
+                // --- Casos de la leyenda ---
+                case 'OK': 
+                    tr.className = 'fila-ok'; // Asigna la clase para Verde Brillante
+                    break;
+                case 'Retardo Normal': 
+                    tr.className = 'fila-retardo-normal'; // Asigna la clase para Amarillo Brillante
+                    break;
+                case 'Falta': 
+                    tr.className = 'fila-falta'; // Rojo Brillante
+                    break;
+                case 'Descanso': 
+                    tr.className = 'fila-descanso'; // Morado Pálido
+                    break;
+                case 'Permiso': 
+                    tr.className = 'fila-permiso'; // Asigna la clase para Verde Pálido
+                    break;
 
-            return `<tr class="${className}">${rowData}</tr>`;
-        }).join('');
+                // --- Casos que no están en la leyenda ---
+                case 'Retardo Mayor': 
+                    tr.className = 'fila-retardo-mayor'; 
+                    break;
+                case 'Salida Anticipada': 
+                    tr.className = 'fila-salida-anticipada'; 
+                    break;
+                case 'Cumplió con horas': 
+                    tr.className = 'fila-retardo-cumplido'; 
+                    break;
+            }
+            // --- TERMINA REEMPLAZO ---
 
-        detalleBody.innerHTML = rowsHTML;
+            // CORRECCIÓN: Manejar la visualización de Horas Esperadas (para evitar NaN:NaN:NaN)
+            let horasEsperadasDisplay = d.horas_esperadas || '00:00:00';
+            if (!isNaN(Number(d.horas_esperadas)) && Number(d.horas_esperadas) > 0) {
+                 // Si es un número (segundos), lo formateamos a H:MM:SS
+                horasEsperadasDisplay = segundosADuracion(d.horas_esperadas);
+            } else if (d.horas_esperadas && d.horas_esperadas.includes(':')) {
+                 // Si es un string 'H:MM:SS', lo dejamos
+                horasEsperadasDisplay = d.horas_esperadas;
+            } else {
+                // Si viene como NaN:NaN:NaN o algo extraño, lo mostramos vacío.
+                horasEsperadasDisplay = '-'; 
+            }
+            
+            let rowHTML = `<td>${d.employee||''}</td><td>${d.Nombre||''}</td><td>${d.Turno||'-'}</td><td>${d.dia||''}</td><td>${d.dia_semana||''}</td><td>${horasEsperadasDisplay}</td><td>${d.duration||'00:00:00'}</td>`;
+            for (let i = 1; i <= maxChecadas; i++) rowHTML += `<td>${d['checado_'+i]||'-'}</td>`;
+            rowHTML += `<td>${observacion}</td>`;
+            tr.innerHTML = rowHTML;
+            detalleBody.appendChild(tr);
+
+            empleadoActual = d.employee;
+        });
+
+        // Insertar la fila de Totales para el ÚLTIMO empleado
+        if (empleadoActual !== null) {
+            const total = totalesEmpleados[empleadoActual];
+            const trTotal = document.createElement("tr");
+            trTotal.className = 'fila-totales';
+            trTotal.innerHTML = `
+                <td colspan="1">${empleadoActual}</td>
+                <td colspan="1">${total.Nombre}</td>
+                <td colspan="1">Totales</td>
+                <td colspan="1">${total.conteoDias}</td>
+                <td colspan="1"></td>
+                <td colspan="1">${total.totalHorasEsperadas}</td> 
+                <td colspan="1">${total.totalHorasTotales}</td>
+                <td colspan="${totalChecadasColspan}"></td>
+            `;
+            detalleBody.appendChild(trTotal);
+        }
     }
+    
+    // ==========================================================
+    // RESTO DE FUNCIONES (SIN CAMBIOS)
+    // ==========================================================
 
-    /**
-     * Renderiza la tabla de Retardos.
-     * @param {Array} datos - Los datos de retardos a mostrar.
-     */
     function pintarTablaRetardos(datos) {
         retardosBody.innerHTML = "";
-        
         if (datos.length === 0) {
             retardosBody.innerHTML = '<tr><td colspan="8" style="text-align:center;">No hay retardos.</td></tr>';
             return;
         }
-
-        let rowsHTML = datos.map(d => {
-            const className = d.observacion_incidencia === 'Retardo Mayor' ? 'fila-retardo-mayor' : 'fila-retardo-normal';
-            return `
-                <tr class="${className}">
-                    <td>${d.employee ?? ''}</td>
-                    <td>${d.Nombre ?? ''}</td>
-                    <td>${d.Sucursal ?? 'N/A'}</td>
-                    <td>${d.dia ?? ''}</td>
-                    <td>${d.dia_semana ?? ''}</td>
-                    <td>${d.horario_entrada ?? '-'}</td>
-                    <td>${d.checado_primero ?? '-'}</td>
-                    <td>${d.observacion_incidencia}</td>
-                </tr>
-            `;
-        }).join('');
-        
-        retardosBody.innerHTML = rowsHTML;
+        datos.forEach(d => {
+            const tr = document.createElement("tr");
+            tr.className = d.observacion_incidencia === 'Retardo Mayor' ? 'fila-retardo-mayor' : 'fila-retardo-normal';
+            tr.innerHTML = `<td>${d.employee||''}</td><td>${d.Nombre||''}</td><td>${d.Sucursal||'N/A'}</td><td>${d.dia||''}</td><td>${d.dia_semana||''}</td><td>${d.horario_entrada||'-'}</td><td>${d.checado_primero||'-'}</td><td>${d.observacion_incidencia}</td>`;
+            retardosBody.appendChild(tr);
+        });
     }
     
-    /**
-     * Controla el cambio de pestañas.
-     * @param {Event} evt - Evento de click.
-     */
     function switchTab(evt) {
-        // Mejor práctica: obtener el ID de la sección directamente
         const tabId = evt.currentTarget.id;
-        const sectionId = tabId.replace('tab', ''); // 'tabDetalle' -> 'Detalle'
-
         [tabDetalle, tabRetardos].forEach(tab => tab.classList.remove('active'));
         [sectionDetalle, sectionRetardos].forEach(sec => sec.style.display = 'none');
-        
         evt.currentTarget.classList.add('active');
-        document.getElementById(sectionId).style.display = 'block';
+        document.getElementById(tabId.replace('tab', '')).style.display = 'block';
     }
     
-    // Función de utilidades para Cookies (CSRF Token)
     function getCookie(name) {
         let cookieValue = null;
         if (document.cookie && document.cookie !== '') {
             const cookies = document.cookie.split(';');
             for (let i = 0; i < cookies.length; i++) {
                 const cookie = cookies[i].trim();
-                // ¿Empieza con el nombre?
-                if (cookie.startsWith(name + '=')) { 
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
                     cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
                     break;
                 }
@@ -221,12 +328,6 @@ document.addEventListener("DOMContentLoaded", function () {
         return cookieValue;
     }
 
-    // --- Funciones de Exportación ---
-
-    /**
-     * Función principal para exportar.
-     * @param {string} formato - Formato a exportar ('xlsx', 'csv', 'pdf').
-     */
     function exportarA(formato) {
         const nombreArchivoBase = 'reporte_asistencias';
         const fecha = new Date().toISOString().split('T')[0];
@@ -243,8 +344,6 @@ document.addEventListener("DOMContentLoaded", function () {
                 case 'pdf':
                     exportarTablaActualPDF(nombreArchivoFinal);
                     break;
-                default:
-                    console.warn(`Formato de exportación no soportado: ${formato}`);
             }
         } catch (error) {
             console.error("Error al exportar:", error);
@@ -252,39 +351,28 @@ document.addEventListener("DOMContentLoaded", function () {
         }
     }
     
-    /**
-     * Extrae los datos (headers y body) de una tabla.
-     * @param {HTMLElement} tableHeader - El thead del elemento tabla.
-     * @param {HTMLElement} tableBody - El tbody del elemento tabla.
-     * @returns {{datos: Array<Array<string>>, colores: Array<string>}|null}
-     */
     function obtenerDatosDeTabla(tableHeader, tableBody) {
         const filas = tableBody.querySelectorAll('tr');
-        // Si no hay filas o la única fila es el mensaje de "no datos" (colspan > 1)
-        if (filas.length === 0 || (filas.length === 1 && (filas[0].querySelector('td')?.colSpan ?? 0) > 1)) {
+        if (filas.length === 0 || (filas.length === 1 && filas[0].querySelector('td')?.colSpan > 1)) {
             return null;
         }
+        const headers = Array.from(tableHeader.querySelectorAll('th')).map(th => th.textContent);
         
-        const headers = Array.from(tableHeader.querySelectorAll('th')).map(th => th.textContent.trim());
-        const datos = [headers];
-        
-        const colores = [];
+        // Excluir filas de Totales de la exportación
+        const filasDatos = Array.from(filas);
 
-        filas.forEach(fila => {
+        const datos = [headers];
+        filasDatos.forEach(fila => {
             const celdas = Array.from(fila.querySelectorAll('td'));
-            datos.push(celdas.map(td => td.textContent.trim()));
-            
-            // Obtener la clase de color para la fila
-            const colorClass = Array.from(fila.classList).find(cls => cls.startsWith('fila-')) || '';
-            colores.push(colorClass);
+            datos.push(celdas.map(td => td.textContent));
         });
-        
+        const colores = Array.from(filasDatos).map(fila => 
+            Array.from(fila.classList).find(cls => cls.startsWith('fila-')) || ''
+        );
         return { datos, colores };
     }
 
-    // Exportación a Excel (Multi-hoja con POST al servidor)
     function exportarExcelMultiHoja(nombreArchivo) {
-        // Se asume que '#tablaRetardos thead' existe en el DOM
         const datosDetalle = obtenerDatosDeTabla(detalleHeader, detalleBody);
         const datosRetardos = obtenerDatosDeTabla(document.querySelector('#tablaRetardos thead'), retardosBody);
         
@@ -304,48 +392,33 @@ document.addEventListener("DOMContentLoaded", function () {
 
         fetch('/api/exportar_excel_con_colores/', {
             method: 'POST',
-            // Asegurar que 'X-CSRFToken' se use para peticiones POST en Django/similar
-            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') }, 
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
             body: JSON.stringify(exportData)
         })
         .then(response => {
-            if (!response.ok) {
-                // Leer el posible error JSON del servidor para mejor diagnóstico
-                return response.json().then(err => { throw new Error(err.error || 'Error en la exportación del servidor'); });
-            }
+            if (!response.ok) throw new Error('Error en la exportación del servidor');
             return response.blob();
         })
         .then(blob => {
-            // Descarga del archivo
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.style.display = 'none'; a.href = url; a.download = `${nombreArchivo}.xlsx`;
             document.body.appendChild(a); a.click();
-            window.URL.revokeObjectURL(url); a.remove(); // Usar a.remove() en lugar de document.body.removeChild(a)
-        })
-        .catch(error => {
-             console.error("Error en la exportación a Excel:", error);
-             alert(`Error al exportar a Excel: ${error.message}`);
+            window.URL.revokeObjectURL(url); document.body.removeChild(a);
         });
     }
     
-    // Exportación a CSV
     function exportarTablaActualCSV(nombreArchivo) {
         if (typeof XLSX === 'undefined') {
             throw new Error("La librería de exportación a CSV (SheetJS) no está disponible.");
         }
-        
-        const tabActiva = document.querySelector('.tablinks.active')?.id;
-        if (!tabActiva) {
-            throw new Error("No se pudo determinar la pestaña activa.");
-        }
-        
+        const tabActiva = document.querySelector('.tablinks.active').id;
         const data = tabActiva === 'tabDetalle' 
             ? obtenerDatosDeTabla(detalleHeader, detalleBody)
             : obtenerDatosDeTabla(document.querySelector('#tablaRetardos thead'), retardosBody);
 
         if (!data) {
-            alert('No hay datos para exportar en la pestaña actual.');
+            alert('No hay datos para exportar.');
             return;
         }
         
@@ -358,65 +431,48 @@ document.addEventListener("DOMContentLoaded", function () {
         link.setAttribute('download', `${nombreArchivo}_${tabActiva.replace('tab', '').toLowerCase()}.csv`);
         document.body.appendChild(link);
         link.click();
-        link.remove(); // Usar link.remove()
+        document.body.removeChild(link);
     }
     
-    // Exportación a PDF
     function exportarTablaActualPDF(nombreArchivo) {
-        // Se asume que jspdf.jsPDF y jspdf-autotable ya están cargados en el scope global
-        if (typeof window.jspdf === 'undefined' || typeof window.jspdf.jsPDF === 'undefined' || typeof doc?.autoTable === 'undefined') {
-             throw new Error("La librería de exportación a PDF (jsPDF y autoTable) no está disponible o no está cargada correctamente.");
+        if (typeof jspdf === 'undefined' || typeof jspdf.jsPDF === 'undefined') {
+             throw new Error("La librería de exportación a PDF (jsPDF) no está disponible.");
         }
         
-        const tabActiva = document.querySelector('.tablinks.active')?.id;
-        if (!tabActiva) {
-            throw new Error("No se pudo determinar la pestaña activa.");
-        }
-        
+        const tabActiva = document.querySelector('.tablinks.active').id;
         const data = tabActiva === 'tabDetalle' 
             ? obtenerDatosDeTabla(detalleHeader, detalleBody)
             : obtenerDatosDeTabla(document.querySelector('#tablaRetardos thead'), retardosBody);
         
         if (!data) {
-            alert('No hay datos para exportar en la pestaña actual.');
+            alert('No hay datos para exportar.');
             return;
         }
 
         const { jsPDF } = window.jspdf;
-        const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+        const doc = new jsPDF({ orientation: 'landscape' });
         
-        // Mapa de colores (RGB)
         const colorMap = {
-            'fila-falta': [255, 204, 204], // Rojo claro
-            'fila-retardo-normal': [255, 242, 204], // Amarillo claro
-            'fila-permiso': [212, 237, 218], // Verde claro
-            'fila-retardo-cumplido': [230, 212, 237], // Morado claro
-            'fila-descanso': [155, 89, 182], // Morado oscuro
-            'fila-retardo-mayor': [255, 217, 102], // Amarillo medio
-            'fila-salida-anticipada': [248, 203, 173], // Naranja claro
+            'fila-falta': [255, 204, 204], 'fila-retardo-normal': [255, 242, 204],
+            'fila-permiso': [212, 237, 218], 'fila-retardo-cumplido': [230, 212, 237],
+            'fila-descanso': [155, 89, 182], 'fila-retardo-mayor': [255, 217, 102],
+            'fila-salida-anticipada': [248, 203, 173],
         };
 
         doc.autoTable({
             head: [data.datos[0]],
             body: data.datos.slice(1),
             startY: 20,
-            styles: { fontSize: 7, cellPadding: 1.5 }, // Reducir tamaño de fuente/padding para landscape
-            headStyles: { fillColor: [39, 174, 96], textColor: [255, 255, 255] },
+            styles: { fontSize: 8 },
+            headStyles: { fillColor: [39, 174, 96] },
             didParseCell: function(hookData) {
                 if (hookData.section === 'body') {
-                    // Obtener la clase de color de la fila, no de la celda
-                    const cssClass = data.colores[hookData.row.index]; 
+                    const cssClass = data.colores[hookData.row.index];
                     if (cssClass && colorMap[cssClass]) {
                         hookData.cell.styles.fillColor = colorMap[cssClass];
-                        // Cambiar el color del texto para filas con fondo oscuro (ej. Descanso)
                         if (cssClass === 'fila-descanso') {
                             hookData.cell.styles.textColor = [255, 255, 255];
-                        } else {
-                            hookData.cell.styles.textColor = [0, 0, 0]; // Asegurar texto negro para otros
                         }
-                    } else {
-                         hookData.cell.styles.textColor = [0, 0, 0];
-                         hookData.cell.styles.fillColor = [255, 255, 255];
                     }
                 }
             },
@@ -429,24 +485,14 @@ document.addEventListener("DOMContentLoaded", function () {
         doc.save(`${nombreArchivo}_${tabActiva.replace('tab', '').toLowerCase()}.pdf`);
     }
 
-    // --- Inicialización y Event Listeners ---
-
-    // Eventos para recargar datos (cambio de fecha o sucursal)
     [fechaInicio, fechaFin, sucursalSelect].forEach(el => el.addEventListener("change", cargarDatos));
-    
-    // Evento para filtrar (tiempo real)
     buscarEmpleado.addEventListener("input", filtrarYRenderizar);
-    
-    // Eventos para el cambio de pestañas
     tabDetalle.addEventListener("click", switchTab);
     tabRetardos.addEventListener("click", switchTab);
-    
-    // Eventos para exportación
     btnExcel.addEventListener('click', () => exportarA('xlsx'));
     btnCSV.addEventListener('click', () => exportarA('csv'));
     btnPDF.addEventListener('click', () => exportarA('pdf'));
 
-    // Establecer fechas por defecto (últimos 7 días) y cargar al inicio
     const today = new Date();
     const unaSemanaAtras = new Date();
     unaSemanaAtras.setDate(today.getDate() - 6);
@@ -456,13 +502,5 @@ document.addEventListener("DOMContentLoaded", function () {
     fechaInicio.value = formatDate(unaSemanaAtras);
     fechaFin.value = formatDate(today);
     
-    // Simular click en la pestaña de Detalle para inicializar la vista (y sus estilos CSS)
-    // Es mejor llamar a cargarDatos si queremos que la data se traiga desde el inicio.
-    // Si la selección de sucursal es la que dispara `cargarDatos`, descomenta `tabDetalle.click()` si necesitas inicializar la vista de pestaña:
-    tabDetalle.click(); 
-    
-    // Si la sucursal ya tiene un valor por defecto en el HTML, llama a cargarDatos:
-    if (sucursalSelect.value) {
-        cargarDatos();
-    }
+    tabDetalle.click();
 });

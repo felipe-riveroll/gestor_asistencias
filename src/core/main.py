@@ -1,6 +1,5 @@
-"""
-Main orchestration script - VERSIÓN FINAL Y DEFINITIVA
-"""
+# main.py
+
 from datetime import datetime
 from typing import List, Dict
 import os
@@ -8,104 +7,116 @@ from dotenv import load_dotenv
 import pandas as pd
 
 from .api_client import APIClient, procesar_permisos_empleados
-from .services import generar_reporte_asistencia
+# Se importan la clase y las nuevas funciones de services
+from .services import AttendanceProcessor, calcular_metricas_adicionales, agregar_datos_dashboard_por_sucursal
 from .models import Empleado
 
 class AttendanceReportManager:
+    """Clase de ayuda para obtener datos, ya no genera el reporte directamente."""
     def __init__(self):
         self.api_client = APIClient()
     
-    def validate_api_credentials(self) -> bool:
+    def _prepare_report_data(self, start_date: str, end_date: str, sucursal: str):
+        """Método unificado para obtener datos base para cualquier reporte."""
         load_dotenv()
         if not all([os.getenv("ASIATECH_API_KEY"), os.getenv("ASIATECH_API_SECRET")]):
-            return False
-        return True
+            raise ValueError("Credenciales de API no configuradas")
 
-    def validate_input_parameters(self, start_date: str, end_date: str):
-        if not all([start_date, end_date]):
-             raise ValueError("Las fechas de inicio y fin son requeridas.")
-        datetime.strptime(start_date, '%Y-%m-%d')
-        datetime.strptime(end_date, '%Y-%m-%d')
-        if start_date > end_date:
-            raise ValueError("La fecha de inicio no puede ser mayor a la fecha fin")
-
-    def obtener_empleados_por_sucursal(self, sucursal: str) -> List[str]:
-        print(f"🔍 Buscando a TODOS los empleados para la sucursal: {sucursal}")
-        
-        if sucursal == 'Todas':
-            empleados = Empleado.objects.all()
+        if sucursal != 'Todas':
+            empleados = Empleado.objects.filter(asignaciones__sucursal__nombre_sucursal=sucursal).distinct()
         else:
-            empleados = Empleado.objects.filter(
-                asignaciones__sucursal__nombre_sucursal=sucursal
-            ).distinct()
+            empleados = Empleado.objects.all()
             
         codigos_empleados = [str(emp.codigo_frappe) for emp in empleados if emp.codigo_frappe]
-        print(f"📋 Obtenidos {len(codigos_empleados)} empleados para el reporte.")
-        return codigos_empleados
 
-    def generate_attendance_report(self, start_date: str, end_date: str, sucursal: str, device_filter: str) -> dict:
-        print(f"\n🚀 Iniciando reporte para {sucursal} ({start_date} a {end_date})...")
-        try:
-            self.validate_input_parameters(start_date, end_date)
-            if not self.validate_api_credentials():
-                return {"success": False, "error": "Credenciales de API no configuradas"}
+        device_map = {"Villas": "%villas%", "31pte": "%31pte%", "Nave": "%nave%", "RioBlanco": "%rioblanco%"}
+        device_filter = device_map.get(sucursal, "%")
 
-            codigos_empleados = self.obtener_empleados_por_sucursal(sucursal)
-            if not codigos_empleados:
-                return {"success": True, "data": [], "metadata": {"total_empleados": 0}}
+        checkin_records = self.api_client.fetch_checkins(start_date, end_date, device_filter)
+        leave_records = self.api_client.fetch_leave_applications(start_date, end_date)
+        permisos_dict = procesar_permisos_empleados(leave_records)
 
-            checkin_records = self.api_client.fetch_checkins(start_date, end_date, device_filter)
-            leave_records = self.api_client.fetch_leave_applications(start_date, end_date)
-            permisos_dict = procesar_permisos_empleados(leave_records)
+        return codigos_empleados, checkin_records, permisos_dict
 
-            print("\n📊 Procesando datos de asistencia...")
-            df_detalle, df_resumen = generar_reporte_asistencia(
-                checkin_data=checkin_records,
-                permisos_dict=permisos_dict,
-                joining_dates_dict={},
-                start_date=start_date,
-                end_date=end_date,
-                employee_codes=codigos_empleados
-            )
+# --- FUNCIONES ORQUESTADORAS ---
 
-            if df_resumen.empty and codigos_empleados:
-                 print("⚠️  El DataFrame de resumen está vacío, construyendo a partir de la lista de empleados.")
-                 df_resumen = pd.DataFrame(codigos_empleados, columns=['employee'])
-                 employee_map = {str(e.codigo_frappe): f"{e.nombre} {e.apellido_paterno}" for e in Empleado.objects.all()}
-                 df_resumen['Nombre'] = df_resumen['employee'].map(employee_map)
-
-            resultados_frontend = self._format_for_frontend(df_resumen)
-            print("\n🎉 ¡Proceso completado!")
-            
-            return {
-                "success": True,
-                "data": resultados_frontend,
-                "metadata": {"total_empleados": len(df_resumen)}
-            }
-        except Exception as e:
-            import traceback; traceback.print_exc()
-            return {"success": False, "error": str(e)}
-
-    def _format_for_frontend(self, df_resumen: pd.DataFrame) -> List[Dict]:
-        df_resumen = df_resumen.copy()
-        columnas_esperadas = [
-            'employee', 'Nombre', 'Sucursal', 'total_horas_trabajadas', 'total_horas_esperadas', 
-            'total_horas_descontadas_permiso', 'total_horas_descanso', 'total_horas',
-            'diferencia_HHMMSS', 'total_faltas', 'total_retardos', 'total_salidas_anticipadas'
-        ]
-        for col in columnas_esperadas:
-            if col not in df_resumen.columns:
-                if 'total' in col or 'faltas' in col: df_resumen[col] = 0
-                else: df_resumen[col] = 'N/A'
+def generar_reporte_completo(start_date: str, end_date: str, sucursal: str) -> dict:
+    """Orquestador para el Reporte de Horas (Resumen)."""
+    try:
+        manager = AttendanceReportManager()
+        processor = AttendanceProcessor()
         
-        for col in df_resumen.columns:
-            if 'int' in str(df_resumen[col].dtype) or 'float' in str(df_resumen[col].dtype):
-                df_resumen[col] = df_resumen[col].fillna(0)
-            else:
-                df_resumen[col] = df_resumen[col].fillna('')
+        codigos, checkins, permisos = manager._prepare_report_data(start_date, end_date, sucursal)
+        if not codigos:
+            return {"success": True, "data": []}
 
-        return df_resumen.to_dict('records')
+        # La lógica de procesamiento ahora la llama directamente main.py
+        df_detalle, df_resumen = processor.procesar_reporte_completo(
+            checkin_data=checkins,
+            permisos_dict=permisos,
+            start_date=start_date,
+            end_date=end_date,
+            employee_codes=codigos
+        )
+        return {"success": True, "data": df_resumen.to_dict('records')}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
 
-def generar_reporte_completo(start_date: str, end_date: str, sucursal: str, device_filter: str) -> dict:
-    manager = AttendanceReportManager()
-    return manager.generate_attendance_report(start_date, end_date, sucursal, device_filter)
+def generar_reporte_detalle_completo(start_date: str, end_date: str, sucursal: str) -> dict:
+    """Orquestador para la Lista de Asistencias (Detalle)."""
+    try:
+        manager = AttendanceReportManager()
+        processor = AttendanceProcessor()
+
+        codigos, checkins, permisos = manager._prepare_report_data(start_date, end_date, sucursal)
+        if not codigos:
+            return {"success": True, "data": []}
+            
+        df_final = processor.procesar_reporte_detalle(
+            checkin_data=checkins,
+            permisos_dict=permisos,
+            start_date=start_date,
+            end_date=end_date,
+            employee_codes=codigos
+        )
+        return {"success": True, "data": df_final.to_dict('records')}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+# === NUEVA FUNCIÓN ORQUESTADORA PARA DASHBOARD GENERAL ===
+
+def generar_datos_dashboard_general(start_date: str, end_date: str) -> dict:
+    """Orquestador para obtener los datos agregados por sucursal para el dashboard general."""
+    try:
+        manager = AttendanceReportManager()
+        processor = AttendanceProcessor()
+        
+        # 1. Obtener datos de todas las sucursales
+        codigos, checkins, permisos = manager._prepare_report_data(start_date, end_date, sucursal='Todas')
+        if not codigos:
+            return {"success": True, "data": {"branches": []}}
+
+        # 2. Procesar los reportes para obtener dataframes de detalle y resumen
+        df_detalle, df_resumen = processor.procesar_reporte_completo(
+            checkin_data=checkins,
+            permisos_dict=permisos,
+            start_date=start_date,
+            end_date=end_date,
+            employee_codes=codigos
+        )
+
+        if df_resumen.empty:
+            return {"success": True, "data": {"branches": []}}
+
+        # 3. Calcular métricas avanzadas (Eficiencia, Puntualidad, Bradford)
+        df_metricas = calcular_metricas_adicionales(df_resumen, df_detalle)
+
+        # 4. Agregar los datos por sucursal
+        datos_agregados = agregar_datos_dashboard_por_sucursal(df_metricas)
+
+        # 5. Estructurar la respuesta final como la espera el frontend
+        return {"success": True, "data": {"branches": datos_agregados}}
+
+    except Exception as e:
+        print(f"[ERROR Dashboard General]: {e}") # Log para debugging
+        return {"success": False, "error": str(e)}

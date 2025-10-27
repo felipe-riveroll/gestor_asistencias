@@ -1,10 +1,10 @@
 from django.contrib import admin
 from django.urls import path
-from core import views  # importa la vista
+from core import views
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('', views.inicio, name='inicio'),  # <-- ruta raíz
+    path('', views.inicio, name='inicio'),
     path('login/', views.login_view, name='login'),
     path("logout/", views.logout_view, name="logout"),
     path("admin-page/", views.admin_page, name="admin_page"),
@@ -18,4 +18,8 @@ urlpatterns = [
     path('health/', views.health_check, name='health_check'),
     path('api/reporte_horas/', views.api_reporte_horas, name='api_reporte_horas'),
     path('reporte_horas/', views.reporte_horas, name='reporte_horas'),
+    path('api/reporte_detalle/', views.api_reporte_detalle, name='api_reporte_detalle'),
+    path('api/exportar_excel_con_colores/', views.exportar_excel_con_colores, name='exportar_excel_con_colores'),
+    path("grafica_general/", views.grafica_general, name="grafica_general"),
+    path("api/dashboard/general/", views.api_dashboard_general, name="api_dashboard_general"),
 ]

@@ -317,6 +317,49 @@ tbody td:first-child {
     color: #000000;
 }
 
+/* ======================================================= */
+/* ===== INICIO: COLORES DE FILAS DE REPORTE (NUEVO) ===== */
+/* ======================================================= */
+
+/* --- Colores de la leyenda --- */
+.fila-ok {
+    background-color: #92D050 !important; /* Verde Brillante (Checado Normal) */
+}
+.fila-retardo-normal {
+    background-color: #FFFF00 !important; /* Amarillo Brillante (Retardo Normal) */
+}
+.fila-falta {
+    background-color: #FF0000 !important; /* Rojo Brillante (Falta) */
+}
+.fila-descanso {
+    background-color: #B2A1C7 !important; /* Morado Pálido (Fines de Semana) */
+}
+.fila-permiso {
+    background-color: #E2EFDA !important; /* Verde Pálido (Permiso) */
+}
+
+/* --- Colores que no están en la leyenda --- */
+.fila-retardo-mayor {
+    background-color: #FFD966 !important; /* Amarillo/Dorado pálido */
+}
+.fila-salida-anticipada {
+    background-color: #F8CBAD !important; /* Naranja pálido */
+}
+.fila-retardo-cumplido {
+    background-color: #E6D4ED !important; /* Morado pálido (diferente) */
+}
+
+/* --- Color de Fila de Totales --- */
+.fila-totales {
+    background-color: #DDEBF7 !important; /* Un azul muy pálido */
+    gont-weight: bold;
+    color: #000000;
+}
+
+/* ======================================================= */
+/* ===== FIN: COLORES DE FILAS DE REPORTE (NUEVO) ===== */
+/* ======================================================= */
+
 .no-data {
     text-align: center;
     font-style: italic;

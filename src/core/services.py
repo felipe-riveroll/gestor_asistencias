@@ -17,6 +17,8 @@ from .config import (
 )
 from .utils import td_to_str
 from .db_postgres_connection import obtener_horario_empleado_completo
+import numpy as np
+
 
 def autenticar_usuario(request, email, password):
     try:
@@ -115,7 +117,7 @@ def crear_horario_service(data):
         descripcion_horario=data.get("descripcionHorario") or "",
     )
 
-#Reporte de Horas
+#Reporte de Horas y Lista de Asistencias
 class AttendanceProcessor:
     def process_checkins_to_dataframe(self, checkin_data, start_date, end_date, employee_codes=None):
         df = pd.DataFrame(checkin_data) if checkin_data else pd.DataFrame(columns=['employee', 'time'])
@@ -161,12 +163,8 @@ class AttendanceProcessor:
         final_df["dia_semana"] = final_df["dia_obj"].dt.day_name()
         return final_df
 
-    # 🚨 FUNCIÓN CORREGIDA ESTRUCTURALMENTE 🚨
     def analizar_asistencia_con_horarios(self, df: pd.DataFrame, start_date_str: str, end_date_str: str) -> pd.DataFrame:
         if df.empty: return df
-        print("\n🔄 Analizando horarios (MODIFICACIÓN ESTRUCTURAL FINAL)...")
-        
-        # 1. Inicialización de columnas
         for col in ["horas_esperadas", "horario_entrada", "horario_salida", "Sucursal"]:
             if 'horas' in col: df[col] = pd.Timedelta(0)
             else: df[col] = None
@@ -176,17 +174,10 @@ class AttendanceProcessor:
         
         start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
         
-        # 🟢 CORRECCIÓN CLAVE: Obtener el horario UNA SOLA VEZ para el rango completo.
-        # Esto soluciona los errores de suma de horas para todos los empleados.
-        print("   -> Obteniendo horarios para todo el periodo (simplificado)...")
         horarios_periodo = {e: obtener_horario_empleado_completo(e, start_date.strftime('%Y-%m-%d')) for e in employees_to_fetch}
         
-        # 2. Iteramos sobre todos los días y empleados en el DataFrame base
         for idx, row in df.iterrows():
-            # Usamos el horario obtenido del periodo completo, ignorando la lógica de quincenas
             horario_emp = horarios_periodo.get(row['employee'])
-            
-            # Si no hay horario asignado o no tiene días con horario, continuamos
             if not horario_emp or horario_emp.get('dias_con_horario', 0) == 0: continue
             
             df.at[idx, 'Sucursal'] = horario_emp.get('sucursal', 'N/A')
@@ -195,19 +186,12 @@ class AttendanceProcessor:
             
             if dia_horario.get('tiene_horario'):
                 horas_dia = dia_horario.get('horas_totales', 0)
-                
-                # CÓDIGO DE DIAGNÓSTICO (mantener para ver si la data es correcta)
-                if row['employee'] in ['1', '10', '12', '78'] and horas_dia == 0:
-                    print(f"🚨 ALERTA 🚨 Emp: {row['employee']}, Día: {row['dia']} no tiene horario asignado (Horas: {horas_dia})")
-                
                 df.at[idx, 'horas_esperadas'] = timedelta(hours=horas_dia)
                 df.at[idx, 'horario_entrada'] = dia_horario.get('entrada')
                 df.at[idx, 'horario_salida'] = dia_horario.get('salida')
-        
-        print("✅ Análisis de horarios completado.")
         return df
 
-    def aplicar_permisos_detallados(self, df: pd.DataFrame, permisos_dict: Dict) -> pd.DataFrame:
+    def aplicar_permisos_detallados(self, df: pd.DataFrame, permisos_dict: dict) -> pd.DataFrame:
         df['horas_permiso'] = pd.Timedelta(0); df['tiene_permiso'] = False
         if df.empty or not permisos_dict: return df
         for emp_code, permisos in permisos_dict.items():
@@ -218,12 +202,6 @@ class AttendanceProcessor:
                     df.loc[idx, 'tiene_permiso'] = True
                     descuento = df.loc[idx, 'horas_esperadas'] / 2 if info.get('is_half_day', False) else df.loc[idx, 'horas_esperadas']
                     df.loc[idx, 'horas_permiso'] = descuento
-        return df
-
-    def calcular_horas_descanso(self, df: pd.DataFrame) -> pd.DataFrame:
-        df['horas_descanso'] = pd.Timedelta(0)
-        mask = (df['checados_count'] >= 4) & (df['duration'] > pd.Timedelta(0))
-        df.loc[mask, 'horas_descanso'] = pd.Timedelta(hours=1)
         return df
 
     def analizar_incidencias(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -247,17 +225,9 @@ class AttendanceProcessor:
     def calcular_resumen_final(self, df: pd.DataFrame) -> pd.DataFrame:
         if df.empty: return pd.DataFrame()
         
-        # Corrección: El cálculo de permisos NO debe modificar 'horas_esperadas'
-        # Hacemos una copia para el cálculo del resumen.
         df['horas_esperadas_netas'] = df['horas_esperadas'] - df.get('horas_permiso', pd.Timedelta(0))
-
-        df['falta_justificada'] = df.apply(
-            lambda x: 1 if x['tiene_permiso'] and x['horas_permiso'] == x['horas_esperadas'] else 0,
-            axis=1
-        )
-        # Asumimos que un episodio de ausencia es igual a una falta
+        df['falta_justificada'] = df.apply(lambda x: 1 if x['tiene_permiso'] and x['horas_permiso'] == x['horas_esperadas'] else 0, axis=1)
         df['episodio_ausencia_diario'] = df['falta'] 
-        # ------------------------------------------------------------------
 
         agg_dict = {
             'Nombre': 'first', 'Sucursal': 'first', 'duration': 'sum', 'horas_esperadas': 'sum',
@@ -267,16 +237,10 @@ class AttendanceProcessor:
         df_resumen = df.groupby('employee').agg(agg_dict).reset_index().rename(columns={
             'duration': 'total_horas_trabajadas_td', 'horas_esperadas': 'total_horas_esperadas_td',
             'horas_permiso': 'total_horas_descontadas_permiso_td', 'horas_descanso': 'total_horas_descanso_td',
-            'falta': 'faltas_del_periodo', 
-            
-            # 2. Renombrar las demás (ya no hay conflicto)
-            'retardo': 'total_retardos', 
-            'salida_anticipada': 'total_salidas_anticipadas',
-            'falta_justificada': 'faltas_justificadas', 
+            'falta': 'faltas_del_periodo', 'retardo': 'total_retardos', 
+            'salida_anticipada': 'total_salidas_anticipadas', 'falta_justificada': 'faltas_justificadas', 
             'episodio_ausencia_diario': 'episodios_ausencia',
         })
-        
-        # NOTA: Se eliminó el código de inyección temporal de valores, la corrección estructural debe bastar.
         
         df_resumen['total_horas_td'] = df_resumen['total_horas_esperadas_td'] - df_resumen['total_horas_descontadas_permiso_td']
         df_resumen['diferencia_td'] = df_resumen['total_horas_trabajadas_td'] - df_resumen['total_horas_td']
@@ -286,47 +250,51 @@ class AttendanceProcessor:
         
         df_resumen['diferencia_HHMMSS'] = df_resumen['diferencia_td'].apply(lambda x: f"-{td_to_str(abs(x))}" if x.total_seconds() < 0 else td_to_str(x))
         df_resumen['total_faltas'] = df_resumen['faltas_del_periodo'] 
-
-        # 🟢 CORRECCIÓN CLAVE: Forzar la conversión a número entero
         df_resumen['total_retardos'] = df_resumen['total_retardos'].fillna(0).astype(int)
         df_resumen['total_salidas_anticipadas'] = df_resumen['total_salidas_anticipadas'].fillna(0).astype(int)
-        # -------------------------------------------------------------
 
         return df_resumen[['employee', 'Nombre', 'Sucursal', 'total_horas_trabajadas', 'total_horas_esperadas', 
                             'total_horas_descontadas_permiso', 'total_horas_descanso', 'total_horas',
                             'diferencia_HHMMSS', 'total_faltas', 'total_retardos', 'total_salidas_anticipadas',
-                            'faltas_del_periodo', 
-                            'faltas_justificadas', 
-                            'episodios_ausencia',]]
+                            'faltas_del_periodo', 'faltas_justificadas', 'episodios_ausencia',]]
 
-    # Reemplaza la función existente en services.py
+    def calcular_descanso_real_detallado(self, df_checadas_completo: pd.DataFrame) -> pd.DataFrame:
+        if df_checadas_completo.empty or 'time' not in df_checadas_completo.columns:
+            return pd.DataFrame(columns=['employee', 'dia', 'horas_descanso'])
 
-    def procesar_reporte_completo(self, checkin_data, permisos_dict, joining_dates_dict, start_date, end_date, employee_codes=None):
-        
-        # 1. Crear el DataFrame con TODAS las checadas (esto es importante)
+        df_checadas_completo['time'] = pd.to_datetime(df_checadas_completo['time'])
+        grupos = df_checadas_completo.groupby(['employee', 'dia'])
+        descansos_calculados = []
+
+        for (empleado, dia), grupo in grupos:
+            checadas_ordenadas = grupo.sort_values('time')['time'].tolist()
+            total_descanso_dia = timedelta(0)
+            if len(checadas_ordenadas) >= 4:
+                for i in range(1, len(checadas_ordenadas) - 1, 2):
+                    salida_descanso = checadas_ordenadas[i]
+                    entrada_descanso = checadas_ordenadas[i+1]
+                    total_descanso_dia += (entrada_descanso - salida_descanso)
+            
+            descansos_calculados.append({
+                'employee': empleado, 'dia': dia, 'horas_descanso': total_descanso_dia
+            })
+        return pd.DataFrame(descansos_calculados)
+
+    def procesar_reporte_completo(self, checkin_data, permisos_dict, start_date, end_date, employee_codes=None):
         df_checadas_original = pd.DataFrame(checkin_data) if checkin_data else pd.DataFrame()
-        
-        # --- AÑADE ESTE BLOQUE DE CÓDIGO AQUÍ ---
-        # Asegurarnos de que la columna 'dia' exista antes de usarla
         if not df_checadas_original.empty and 'time' in df_checadas_original.columns:
             df_checadas_original['time'] = pd.to_datetime(df_checadas_original['time'])
             df_checadas_original['dia'] = df_checadas_original['time'].dt.date
-        # ---------------------------------------------
 
-        # 2. Procesamiento principal que resume las checadas (primera y última)
         df_detalle = self.process_checkins_to_dataframe(checkin_data, start_date, end_date, employee_codes)
-        if df_detalle.empty: 
-            return pd.DataFrame(), pd.DataFrame()
+        if df_detalle.empty: return pd.DataFrame(), pd.DataFrame()
         
         df_detalle = self.analizar_asistencia_con_horarios(df_detalle, start_date, end_date)
         df_detalle = self.aplicar_permisos_detallados(df_detalle, permisos_dict)
         
-        # 3. Calcular los descansos reales usando la nueva función y el DF original
         df_descansos = self.calcular_descanso_real_detallado(df_checadas_original)
         
-        # 4. Unir los descansos calculados al DataFrame detallado principal
         if not df_descansos.empty:
-            # Asegurarnos que el tipo de 'dia' sea el mismo antes de unir
             df_descansos['dia'] = pd.to_datetime(df_descansos['dia']).dt.date
             df_detalle = pd.merge(df_detalle, df_descansos, on=['employee', 'dia'], how='left')
             df_detalle['horas_descanso'] = df_detalle['horas_descanso'].fillna(pd.Timedelta(0))
@@ -338,47 +306,132 @@ class AttendanceProcessor:
         
         return df_detalle, df_resumen
 
-    # Añade esta NUEVA función dentro de la clase AttendanceProcessor en services.py
-
-    def calcular_descanso_real_detallado(self, df_checadas_completo: pd.DataFrame) -> pd.DataFrame:
-        """
-        Calcula la duración real del descanso basándose en todas las checadas del día.
-        Suma los intervalos entre la 2da-3ra, 4ta-5ta, etc.
-        """
-        if df_checadas_completo.empty or 'time' not in df_checadas_completo.columns:
-            return pd.DataFrame(columns=['employee', 'dia', 'horas_descanso'])
-
-        # Asegurarse de que 'time' sea datetime
-        df_checadas_completo['time'] = pd.to_datetime(df_checadas_completo['time'])
-
-        # Agrupar por empleado y día para procesar las checadas
-        grupos = df_checadas_completo.groupby(['employee', 'dia'])
+    def pivot_checkins(self, df_checadas: pd.DataFrame) -> pd.DataFrame:
+        if df_checadas.empty or 'time' not in df_checadas.columns:
+            return pd.DataFrame()
         
-        descansos_calculados = []
+        df = df_checadas.copy()
+        df['checado_time'] = pd.to_datetime(df['time']).dt.time
+        df = df.sort_values(['employee', 'time'])
+        df['checkin_rank'] = df.groupby(['employee', 'dia']).cumcount() + 1
+        
+        df_pivoted = df.pivot_table(index=['employee', 'dia'], columns='checkin_rank', values='checado_time', aggfunc='first').reset_index()
+        
+        max_checkins = max([col for col in df_pivoted.columns if isinstance(col, int)], default=0)
+        rename_dict = {i: f'checado_{i}' for i in range(1, max_checkins + 1)}
+        df_pivoted.rename(columns=rename_dict, inplace=True)
+        return df_pivoted
 
-        for (empleado, dia), grupo in grupos:
-            # Ordenar las checadas del día cronológicamente
-            checadas_ordenadas = grupo.sort_values('time')['time'].tolist()
-            
-            total_descanso_dia = timedelta(0)
-            
-            # Solo podemos calcular descansos si hay un número par y >= 4 checadas
-            if len(checadas_ordenadas) >= 4:
-                # Iterar sobre los pares de checadas que representan un descanso
-                # (Salida -> Entrada) -> (1, 2), (3, 4), etc. en índices de lista
-                for i in range(1, len(checadas_ordenadas) - 1, 2):
-                    salida_descanso = checadas_ordenadas[i]
-                    entrada_descanso = checadas_ordenadas[i+1]
-                    total_descanso_dia += (entrada_descanso - salida_descanso)
-            
-            descansos_calculados.append({
-                'employee': empleado,
-                'dia': dia,
-                'horas_descanso': total_descanso_dia
-            })
+    def determinar_observaciones(self, df: pd.DataFrame) -> pd.DataFrame:
+        df_copy = df.copy()
+        
+        first_check = pd.to_datetime(df_copy['checado_primero'].astype(str), errors='coerce', format='%H:%M:%S')
+        entry_schedule = pd.to_datetime(df_copy['horario_entrada'].astype(str), errors='coerce', format='%H:%M:%S')
 
-        return pd.DataFrame(descansos_calculados)
+        conditions = [
+            df_copy['tiene_permiso'] == True,
+            (df_copy['horas_esperadas'].dt.total_seconds() == 0) & (df_copy['checados_count'] == 0),
+            df_copy['falta'] == 1,
+            (df_copy['retardo'] == 1) & (df_copy['duration'] >= df_copy['horas_esperadas']),
+            (first_check - entry_schedule).dt.total_seconds() > (30 * 60),
+            df_copy['retardo'] == 1,
+            df_copy['salida_anticipada'] == 1,
+        ]
+        choices = ['Permiso', 'Descanso', 'Falta', 'Cumplió con horas', 'Retardo Mayor', 'Retardo Normal', 'Salida Anticipada']
+        df_copy['observacion_incidencia'] = np.select(conditions, choices, default='OK')
+        return df_copy
 
-def generar_reporte_asistencia(checkin_data, permisos_dict, joining_dates_dict, start_date, end_date, employee_codes=None):
-    processor = AttendanceProcessor()
-    return processor.procesar_reporte_completo(checkin_data, permisos_dict, joining_dates_dict, start_date, end_date, employee_codes)
+    def procesar_reporte_detalle(self, checkin_data, permisos_dict, start_date, end_date, employee_codes=None):
+        df_checadas_original = pd.DataFrame(checkin_data) if checkin_data else pd.DataFrame(columns=['employee', 'time'])
+        if not df_checadas_original.empty and 'time' in df_checadas_original.columns:
+            df_checadas_original['time'] = pd.to_datetime(df_checadas_original['time'])
+            df_checadas_original['dia'] = df_checadas_original['time'].dt.date
+
+        df_detalle = self.process_checkins_to_dataframe(checkin_data, start_date, end_date, employee_codes)
+        if df_detalle.empty: return pd.DataFrame()
+
+        df_detalle = self.analizar_asistencia_con_horarios(df_detalle, start_date, end_date)
+        df_detalle = self.aplicar_permisos_detallados(df_detalle, permisos_dict)
+        df_detalle = self.analizar_incidencias(df_detalle)
+        
+        df_pivoted = self.pivot_checkins(df_checadas_original)
+
+        if not df_pivoted.empty:
+            df_pivoted['employee'] = df_pivoted['employee'].astype(str)
+            df_pivoted['dia'] = pd.to_datetime(df_pivoted['dia']).dt.date
+            df_detalle = pd.merge(df_detalle, df_pivoted, on=['employee', 'dia'], how='left')
+
+        df_detalle = self.determinar_observaciones(df_detalle)
+
+        for col in ['duration', 'horas_esperadas']:
+            if col in df_detalle.columns:
+                df_detalle[col] = df_detalle[col].apply(td_to_str)
+        
+        for col in df_detalle.columns:
+            if col.startswith('checado_') or col.startswith('horario_'):
+                df_detalle[col] = df_detalle[col].apply(lambda x: x.strftime('%H:%M:%S') if pd.notna(x) and not isinstance(x, str) else x)
+
+        df_detalle['dia_semana'] = df_detalle['dia_semana'].map(DIAS_ESPANOL).fillna(df_detalle['dia_semana'])
+        df_detalle['dia'] = df_detalle['dia'].astype(str)
+        df_detalle.fillna('-', inplace=True)
+        return df_detalle
+
+#Grafica General
+def calcular_metricas_adicionales(df_resumen: pd.DataFrame, df_detalle: pd.DataFrame) -> pd.DataFrame:
+    """
+    Calcula métricas adicionales como Eficiencia, Puntualidad y Bradford por empleado.
+    """
+    if df_resumen.empty or df_detalle.empty:
+        return df_resumen
+
+    # 1. Calcular Eficiencia
+    # Convertimos a segundos, manejando división por cero
+    total_horas_trabajadas_s = df_resumen['total_horas_trabajadas_td'].dt.total_seconds()
+    total_horas_netas_s = df_resumen['total_horas_td'].dt.total_seconds()
+    df_resumen['efficiency'] = (total_horas_trabajadas_s / total_horas_netas_s * 100).fillna(0)
+    df_resumen['efficiency'] = df_resumen['efficiency'].clip(0, 100) # Aseguramos que no pase de 100%
+
+    # 2. Calcular Puntualidad
+    # Contar días laborables por empleado desde el df_detalle
+    dias_laborables = df_detalle[df_detalle['horas_esperadas'].dt.total_seconds() > 0].groupby('employee').size()
+    dias_laborables.name = 'dias_laborables'
+    df_resumen = df_resumen.merge(dias_laborables, on='employee', how='left').fillna(0)
+    
+    # Puntualidad = (Días laborables - retardos) / Días laborables
+    df_resumen['punctuality'] = ((df_resumen['dias_laborables'] - df_resumen['total_retardos']) / df_resumen['dias_laborables'] * 100).fillna(100)
+    df_resumen['punctuality'] = df_resumen['punctuality'].clip(0, 100)
+
+    # 3. Calcular Factor Bradford
+    # B = S^2 * D (S=episodios de ausencia, D=días totales de ausencia)
+    df_resumen['bradford_factor'] = (df_resumen['episodios_ausencia'] ** 2) * df_resumen['faltas_del_periodo']
+
+    return df_resumen
+
+
+def agregar_datos_dashboard_por_sucursal(df_metricas: pd.DataFrame) -> List[Dict]:
+    """
+    Agrupa el DataFrame con métricas por sucursal y calcula los KPIs para el dashboard.
+    """
+    if df_metricas.empty or 'Sucursal' not in df_metricas.columns:
+        return []
+
+    # Agrupar por sucursal y agregar los datos
+    df_sucursales = df_metricas.groupby('Sucursal').agg(
+        employees=('employee', 'count'),
+        efficiency=('efficiency', 'mean'),
+        punctuality=('punctuality', 'mean'),
+        avgBradford=('bradford_factor', 'mean'),
+        absences=('faltas_del_periodo', 'sum')
+    ).reset_index()
+
+    # Renombrar la columna 'Sucursal' a 'name' para que coincida con el JS
+    df_sucursales.rename(columns={'Sucursal': 'name'}, inplace=True)
+    
+    # Añadimos un SIC promedio (usando eficiencia como proxy, ya que no está definido)
+    df_sucursales['avgSIC'] = df_sucursales['efficiency']
+    
+    # Formatear a dos decimales y convertir a lista de diccionarios
+    for col in ['efficiency', 'punctuality', 'avgBradford', 'avgSIC']:
+        df_sucursales[col] = df_sucursales[col].round(2)
+        
+    return df_sucursales.to_dict('records')
