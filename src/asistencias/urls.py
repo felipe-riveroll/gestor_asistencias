@@ -19,7 +19,8 @@ urlpatterns = [
     path('api/reporte_horas/', views.api_reporte_horas, name='api_reporte_horas'),
     path('reporte_horas/', views.reporte_horas, name='reporte_horas'),
     path('api/reporte_detalle/', views.api_reporte_detalle, name='api_reporte_detalle'),
-    path('api/exportar_excel_con_colores/', views.exportar_excel_con_colores, name='exportar_excel_con_colores'),
+    path('api/export_dashboard_excel/', views.export_dashboard_excel, name='export_dashboard_excel'),
     path("grafica_general/", views.grafica_general, name="grafica_general"),
     path("api/dashboard/general/", views.api_dashboard_general, name="api_dashboard_general"),
+    path('api/exportar_excel_con_colores/', views.exportar_excel_con_colores, name='exportar_excel_con_colores'),
 ]

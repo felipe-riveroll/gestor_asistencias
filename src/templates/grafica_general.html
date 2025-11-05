@@ -5,267 +5,127 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard General - Recursos Humanos</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    <link rel="stylesheet" href="{% static 'css/menurh.css' %}">
-    <link rel="stylesheet" href="{% static 'css/grafica_general.css' %}">
-    <link href="https://fonts.googleapis.com/css2?family=Varela+Round&display=swap" rel="stylesheet" />
+    <link rel="icon" href="{% static 'img/logo.png' %}" type="image/png">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="stylesheet" href="{% static 'css/grafica_general.css' %}?v=5"> <link href="https://fonts.googleapis.com/css2?family=Varela+Round&display=swap" rel="stylesheet" />
 </head>
 <body>
-    <div class="main-wrapper"> 
-        <header class="top-navbar">
-            <div class="logo">
-                <h1>Recursos Humanos</h1>
-            </div>
-            <div class="user-menu">
-              <a href="{% url 'logout' %}" id="logoutBtn" class="user-btn" title="Cerrar sesión" aria-label="Cerrar sesión">
-                    <i class="fas fa-sign-out-alt"></i>
-              </a>
-            </div>
-        </header>
 
+    <header class="top-navbar">
+        <div class="logo"><h1>Recursos Humanos</h1></div>
+        <div class="user-menu">
+            <a href="{% url 'logout' %}" id="logoutBtn" class="user-btn" title="Cerrar sesión"><i class="fas fa-sign-out-alt"></i></a>
+        </div>
+    </header>
+
+    <div class="main-wrapper">
         <aside class="sidebar">
-            <nav class="main-menu">
-                <div class="menu-section">
-                    <h3 class="section-title">REPORTES</h3>
-                    <ul>
-                        <li class="menu-item">
-                            <a href="{% url 'reporte_horas' %}">
-                                <i class="fas fa-file-alt"></i>
-                                <span>Reporte de Horas</span>
-                            </a>
-                        </li>
-                        <li class="menu-item">
-                            <a href="{% url 'lista_asistencias' %}">
-                                <i class="fas fa-user-check"></i>
-                                <span>Reporte de Asistencias</span>
-                            </a>
-                        </li>
-                    </ul>
-                </div>
-            </nav>
-            <div class="menu-section">
-                    <h3 class="section-title">PANEL DE GRÁFICAS</h3>
-                    <ul class="main-menu">
-                        <li class="menu-item">
-                            <a href="{% url 'grafica_general' %}">
-                                <i class="fas fa-globe"></i>
-                                <span>General</span>
-                            </a>
-                        </li>
-                        <li class="menu-item">
-                            <a href="#">
-                                <i class="fas fa-map-marker-alt"></i>
-                                <span>31pte</span>
-                            </a>
-                        </li>
-                        <li class="menu-item">
-                            <a href="#">
-                                <i class="fas fa-map-marker-alt"></i>
-                                <span>Villas</span>
-                            </a>
-                        </li>
-                        <li class="menu-item">
-                            <a href="#">
-                                <i class="fas fa-map-marker-alt"></i>
-                                <span>Nave</span>
-                            </a>
-                        </li>
-                        <li class="menu-item">
-                            <a href="#">
-                                <i class="fas fa-map-marker-alt"></i>
-                                <span>Río Blanco</span>
-                            </a>
-                        </li>
-                    </ul>
-                </div>
-            </nav>
+            <div class="menu-section"><h3 class="section-title">REPORTES</h3><ul class="main-menu"><li class="menu-item"><a href="{% url 'reporte_horas' %}"><i class="fas fa-file-alt"></i><span>Reporte de Horas</span></a></li><li class="menu-item"><a href="{% url 'lista_asistencias' %}"><i class="fas fa-user-check"></i><span>Lista de Asistencias</span></a></li></ul></div>
+            <div class="menu-section"><h3 class="section-title">PANEL DE GRÁFICAS</h3><ul class="main-menu"><li class="menu-item"><a href="{% url 'grafica_general' %}" class="active"><i class="fas fa-globe"></i><span>General</span></a></li><li class="menu-item"><a href="#"><i class="fas fa-map-marker-alt"></i><span>31pte</span></a></li><li class="menu-item"><a href="#"><i class="fas fa-map-marker-alt"></i><span>Villas</span></a></li><li class="menu-item"><a href="#"><i class="fas fa-map-marker-alt"></i><span>Nave</span></a></li><li class="menu-item"><a href="#"><i class="fas fa-map-marker-alt"></i><span>Río Blanco</span></a></li></ul></div>
         </aside>
 
-    <div class="dashboard-container">
-        <div class="dashboard-header">
-            <h1 class="dashboard-title">
-                <i class="fa-solid fa-chart-line"></i>
-                Dashboard General - Todas las Sucursales
-            </h1>
-            <button id="exportExcelBtn" class="export-btn">
-                <i class="fa-solid fa-file-excel"></i> Exportar a Excel
-            </button>
-        </div>
-
-        <!-- Filtros -->
-        <div class="filters-section">
-            <div class="filter-group">
-                <div class="filter-item">
-                    <label for="dateRange">Rango de Fechas</label>
-                    <select id="dateRange" class="date-selector">
-                        <option value="today">Hoy</option>
-                        <option value="week">Esta Semana</option>
-                        <option value="month" selected>Este Mes</option>
-                        <option value="quarter">Este Trimestre</option>
-                        <option value="year">Este Año</option>
-                        <option value="custom">Personalizado</option>
-                    </select>
-                </div>
-                <div class="filter-item custom-dates" id="customDates" style="display: none;">
-                    <label for="startDate">Fecha Inicio</label>
-                    <input type="date" id="startDate">
-                </div>
-                <div class="filter-item custom-dates" id="customDatesEnd" style="display: none;">
-                    <label for="endDate">Fecha Fin</label>
-                    <input type="date" id="endDate">
-                </div>
-                <button id="applyFiltersBtn" class="apply-btn">
-                    <i class="fa-solid fa-filter"></i> Aplicar Filtros
-                </button>
-            </div>
-        </div>
-
-        <!-- Estado de carga -->
-        <div class="loading-state" id="loadingState">
-            <div class="spinner"></div>
-            <p>Cargando datos de todas las sucursales...</p>
-        </div>
-
-        <!-- Mensaje sin datos -->
-        <div class="no-data-message" id="noDataMessage">
-            <i class="fa-solid fa-database"></i>
-            <h2>No hay datos disponibles</h2>
-            <p>No se encontraron registros para el período seleccionado</p>
-        </div>
-
-        <!-- Contenido principal -->
-        <div class="dashboard-content" id="dashboardContent" style="display: none;">
-            <!-- KPIs Principales -->
-            <div class="main-kpis">
-                <div class="kpi-card primary">
-                    <div class="kpi-icon">
-                        <i class="fa-solid fa-chart-line"></i>
-                    </div>
-                    <div class="kpi-content">
-                        <div class="kpi-value" id="totalEmployees">0</div>
-                        <div class="kpi-label">Total Empleados</div>
-                    </div>
-                </div>
-                <div class="kpi-card success">
-                    <div class="kpi-icon">
-                        <i class="fa-solid fa-user-check"></i>
-                    </div>
-                    <div class="kpi-content">
-                        <div class="kpi-value" id="avgEfficiency">0%</div>
-                        <div class="kpi-label">Eficiencia Promedio</div>
-                    </div>
-                </div>
-                <div class="kpi-card warning">
-                    <div class="kpi-icon">
-                        <i class="fa-solid fa-clock"></i>
-                    </div>
-                    <div class="kpi-content">
-                        <div class="kpi-value" id="avgPunctuality">0%</div>
-                        <div class="kpi-label">Puntualidad Promedio</div>
-                    </div>
-                </div>
-                <div class="kpi-card danger">
-                    <div class="kpi-icon">
-                        <i class="fa-solid fa-user-xmark"></i>
-                    </div>
-                    <div class="kpi-content">
-                        <div class="kpi-value" id="totalAbsences">0</div>
-                        <div class="kpi-label">Ausencias Totales</div>
-                    </div>
+        <main class="content-area">
+            <div class="dashboard-header">
+                <h1 class="dashboard-title"><i class="fa-solid fa-chart-line"></i> Dashboard General</h1>
+                <div class="header-actions">
+                    <button id="exportExcelBtn" class="export-btn"><i class="fa-solid fa-file-excel"></i> Exportar a Excel</button>
                 </div>
             </div>
 
-            <!-- Gráficas -->
-            <div class="charts-section">
-                <div class="chart-row">
-                    <div class="chart-card large">
-                        <div class="chart-header">
-                            <h3>Eficiencia por Sucursal</h3>
-                            <div class="chart-legend">
-                                <span class="legend-item">
-                                    <span class="legend-color" style="background-color: #851E23"></span>
-                                    Eficiencia
-                                </span>
-                            </div>
-                        </div>
-                        <div class="chart-container">
-                            <canvas id="branchEfficiencyChart"></canvas>
-                        </div>
+            <div class="filters-section">
+                <div class="filter-group">
+                    <div class="filter-item">
+                        <label for="dateRange">Rango de Fechas</label>
+                        <select id="dateRange" class="date-selector">
+                            <option value="today">Hoy</option>
+                            <option value="week">Esta Semana</option>
+                            <option value="month" selected>Este Mes</option>
+                            <option value="quarter">Este Trimestre</option>
+                            <option value="year">Este Año</option>
+                            <option value="custom">Personalizado</option>
+                        </select>
                     </div>
-                </div>
-
-                <div class="chart-row">
-                    <div class="chart-card">
-                        <div class="chart-header">
-                            <h3>Distribución de SIC</h3>
+                     <div class="filter-item custom-dates-wrapper" style="display: none;">
+                        <div class="filter-item custom-dates" id="customDates">
+                             <label for="startDate">Fecha Inicio</label>
+                             <input type="date" id="startDate">
                         </div>
-                        <div class="chart-container">
-                            <canvas id="sicDistributionChart"></canvas>
-                        </div>
-                    </div>
-                    <div class="chart-card">
-                        <div class="chart-header">
-                            <h3>Niveles de Bradford</h3>
-                        </div>
-                        <div class="chart-container">
-                            <canvas id="bradfordLevelsChart"></canvas>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="chart-row">
-                    <div class="chart-card">
-                        <div class="chart-header">
-                            <h3>Top 10 - Eficiencia</h3>
-                        </div>
-                        <div class="chart-container">
-                            <canvas id="topEfficiencyChart"></canvas>
-                        </div>
-                    </div>
-                    <div class="chart-card">
-                        <div class="chart-header">
-                            <h3>Comparativa por Sucursal</h3>
-                        </div>
-                        <div class="chart-container">
-                            <canvas id="branchComparisonChart"></canvas>
+                        <div class="filter-item custom-dates" id="customDatesEnd">
+                             <label for="endDate">Fecha Fin</label>
+                             <input type="date" id="endDate">
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Tabla Resumen -->
-            <div class="table-section">
-                <div class="section-header">
-                    <h3>Resumen por Sucursal</h3>
-                    <div class="table-actions">
-                        <button class="action-btn" id="refreshTableBtn">
-                            <i class="fa-solid fa-rotate"></i> Actualizar
-                        </button>
-                    </div>
-                </div>
-                <div class="table-container">
-                    <table id="summaryTable">
-                        <thead>
-                            <tr>
-                                <th>Sucursal</th>
-                                <th>Empleados</th>
-                                <th>Eficiencia</th>
-                                <th>Puntualidad</th>
-                                <th>Bradford</th>
-                                <th>SIC Promedio</th>
-                                <th>Ausencias</th>
-                            </tr>
-                        </thead>
-                        <tbody id="summaryTableBody">
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    </div>
+            <div class="loading-state" id="loadingState" style="display: none;"><div class="spinner"></div><p>Cargando datos...</p></div>
+            <div class="no-data-message" id="noDataMessage" style="display: none;"><i class="fa-solid fa-database"></i><h2>No hay datos</h2><p>No se encontraron registros</p></div>
 
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+            <div class="dashboard-content" id="dashboardContent" style="display: none;">
+
+                 <div class="main-kpis">
+                     <div class="kpi-card primary"><div class="kpi-icon"><i class="fa-solid fa-users"></i></div><div class="kpi-content"><div class="kpi-value" id="totalEmployees">0</div><div class="kpi-label">Total Empleados</div></div></div>
+                     <div class="kpi-card success"><div class="kpi-icon"><i class="fa-solid fa-chart-line"></i></div><div class="kpi-content"><div class="kpi-value" id="avgEfficiency">0%</div><div class="kpi-label">Eficiencia Promedio</div></div></div>
+                     <div class="kpi-card warning"><div class="kpi-icon"><i class="fa-solid fa-clock"></i></div><div class="kpi-content"><div class="kpi-value" id="avgPunctuality">0%</div><div class="kpi-label">Puntualidad Promedio</div></div></div>
+                     <div class="kpi-card danger"><div class="kpi-icon"><i class="fa-solid fa-user-xmark"></i></div><div class="kpi-content"><div class="kpi-value" id="totalAbsences">0</div><div class="kpi-label">Ausencias Totales</div></div></div>
+                 </div>
+
+                 <div class="charts-section">
+                     <div class="chart-row"><div class="chart-card large"><div class="chart-header"><h3>Eficiencia por Sucursal</h3></div><div class="chart-container"><canvas id="branchEfficiencyChart"></canvas></div></div></div>
+                     <div class="chart-row"><div class="chart-card"><div class="chart-header"><h3>Distribución de SIC</h3></div><div class="chart-container"><canvas id="sicDistributionChart"></canvas></div></div><div class="chart-card"><div class="chart-header"><h3>Resumen del Periodo</h3></div><div class="chart-container"><canvas id="periodEventsChart"></canvas></div></div></div>
+                     <div class="chart-row"><div class="chart-card"><div class="chart-header"><h3>Top 10 - Eficiencia</h3></div><div class="chart-container"><canvas id="topEfficiencyChart"></canvas></div></div><div class="chart-card"><div class="chart-header"><h3>Comparativa por Sucursal</h3></div><div class="chart-container"><canvas id="branchComparisonChart"></canvas></div></div></div>
+                 </div>
+
+                 <div class="table-section">
+                     <div class="section-header"><h3>Resumen por Sucursal</h3> </div>
+                     <div class="table-container"><table id="summaryTable"><thead><tr><th>Sucursal</th><th>Empleados</th><th>Eficiencia</th><th>Puntualidad</th><th>SIC Promedio</th><th>Ausencias</th></tr></thead><tbody id="summaryTableBody"></tbody></table></div>
+                 </div>
+
+                 <div class="table-tabs-section">
+                     <div class="tab-buttons">
+                         <button class="tab-button active" data-tab="summary">Resumen Horas</button>
+                         <button class="tab-button" data-tab="kpis">KPIs Rendimiento</button>
+                     </div>
+                     <div class="search-input-wrapper general-search">
+                         <label for="employeeSearchInput">Buscar Empleado (ID o Nombre)</label>
+                         <input type="text" id="employeeSearchInput" placeholder="Escribe para buscar...">
+                         <i class="fas fa-search search-icon"></i>
+                     </div>
+
+                     <div class="tab-content-container">
+                         <div class="tab-content active" id="summary">
+                             <div class="table-section">
+                                 <div class="section-header"><h3>Resumen de Horas por Empleado</h3></div>
+                                 <div class="table-container">
+                                     <table id="employeeSummaryTable">
+                                         <thead><tr><th>ID</th><th>Empleado</th><th>Hrs. Trabajadas</th><th>Hrs. Planificadas</th><th>Variación</th><th>Retardos</th><th>Ausencias</th></tr></thead>
+                                         <tbody id="employeeSummaryTableBody"></tbody>
+                                     </table>
+                                 </div>
+                             </div>
+                         </div>
+                         <div class="tab-content" id="kpis">
+                             <div class="table-section employee-kpi-section">
+                                 <div class="section-header"><h3>Indicadores de Rendimiento Individual</h3></div>
+                                 <div class="table-container">
+                                     <table id="employeeKpiTable">
+                                         <thead>
+                                             <tr>
+                                                 <th>ID</th>
+                                                 <th>Nombre</th>
+                                                 <th>Faltas Just.</th> <th>Tasa Ausentismo (%)</th>
+                                                 <th>Puntualidad (%)</th> <th>Eficiencia (%)</th> <th>SIC</th>
+                                             </tr>
+                                         </thead>
+                                         <tbody id="employeeKpiTableBody"></tbody>
+                                     </table>
+                                 </div>
+                             </div>
+                         </div>
+                     </div> </div> </div> </main>
+    </div> <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
     <script src="{% static 'js/grafica_general.js' %}"></script>
 </body>
 </html>

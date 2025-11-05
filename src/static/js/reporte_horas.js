@@ -230,14 +230,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // --- LÓGICA DE CARGA INICIAL ---
     const today = new Date();
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(today.getDate() - 6);
+    const oneMonthAgo = new Date(); // <-- 1. LÍNEA CAMBIADA
+    oneMonthAgo.setMonth(today.getMonth() - 1); 
     
     // Función auxiliar para obtener la fecha en formato YYYY-MM-DD (QoL)
     const formatDate = date => date.toISOString().split('T')[0];
 
     // Establecer los valores por defecto
-    startDateInput.value = formatDate(sevenDaysAgo);
+    startDateInput.value = formatDate(oneMonthAgo);
     endDateInput.value = formatDate(today);
     
     // Iniciar la carga del reporte con las fechas predeterminadas

@@ -291,7 +291,7 @@ document.addEventListener("DOMContentLoaded", function () {
     // RESTO DE FUNCIONES (SIN CAMBIOS)
     // ==========================================================
 
-    function pintarTablaRetardos(datos) {
+function pintarTablaRetardos(datos) {
         retardosBody.innerHTML = "";
         if (datos.length === 0) {
             retardosBody.innerHTML = '<tr><td colspan="8" style="text-align:center;">No hay retardos.</td></tr>';
@@ -299,7 +299,20 @@ document.addEventListener("DOMContentLoaded", function () {
         }
         datos.forEach(d => {
             const tr = document.createElement("tr");
-            tr.className = d.observacion_incidencia === 'Retardo Mayor' ? 'fila-retardo-mayor' : 'fila-retardo-normal';
+
+            // --- INICIA CORRECCIÓN ---
+            // Asignar la clase de color correcta según la leyenda
+            const observacion = d.observacion_incidencia || '';
+
+            if (observacion === 'Retardo Normal') {
+                // Amarillo Brillante (según tu leyenda y CSS)
+                tr.className = 'fila-retardo-normal'; 
+            } else if (observacion === 'Retardo Mayor') {
+                // Rojo Brillante (según tu leyenda: "Retardo con Descuento o Falta")
+                tr.className = 'fila-falta'; 
+            }
+            // --- FIN CORRECCIÓN ---
+
             tr.innerHTML = `<td>${d.employee||''}</td><td>${d.Nombre||''}</td><td>${d.Sucursal||'N/A'}</td><td>${d.dia||''}</td><td>${d.dia_semana||''}</td><td>${d.horario_entrada||'-'}</td><td>${d.checado_primero||'-'}</td><td>${d.observacion_incidencia}</td>`;
             retardosBody.appendChild(tr);
         });
@@ -494,12 +507,12 @@ document.addEventListener("DOMContentLoaded", function () {
     btnPDF.addEventListener('click', () => exportarA('pdf'));
 
     const today = new Date();
-    const unaSemanaAtras = new Date();
-    unaSemanaAtras.setDate(today.getDate() - 6);
+    const oneMonthAgo = new Date(); // <-- 1. LÍNEA CAMBIADA
+    oneMonthAgo.setMonth(today.getMonth() - 1);
     
     const formatDate = (date) => date.toISOString().split('T')[0];
     
-    fechaInicio.value = formatDate(unaSemanaAtras);
+    fechaInicio.value = formatDate(oneMonthAgo);
     fechaFin.value = formatDate(today);
     
     tabDetalle.click();

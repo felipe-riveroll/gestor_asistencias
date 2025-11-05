@@ -256,7 +256,9 @@ class AttendanceProcessor:
         return df_resumen[['employee', 'Nombre', 'Sucursal', 'total_horas_trabajadas', 'total_horas_esperadas', 
                             'total_horas_descontadas_permiso', 'total_horas_descanso', 'total_horas',
                             'diferencia_HHMMSS', 'total_faltas', 'total_retardos', 'total_salidas_anticipadas',
-                            'faltas_del_periodo', 'faltas_justificadas', 'episodios_ausencia',]]
+                            'faltas_del_periodo', 'faltas_justificadas', 'episodios_ausencia',
+                            # Columnas TD invisibles para cálculos posteriores
+                            'total_horas_trabajadas_td', 'total_horas_td']]
 
     def calcular_descanso_real_detallado(self, df_checadas_completo: pd.DataFrame) -> pd.DataFrame:
         if df_checadas_completo.empty or 'time' not in df_checadas_completo.columns:
@@ -328,19 +330,29 @@ class AttendanceProcessor:
         first_check = pd.to_datetime(df_copy['checado_primero'].astype(str), errors='coerce', format='%H:%M:%S')
         entry_schedule = pd.to_datetime(df_copy['horario_entrada'].astype(str), errors='coerce', format='%H:%M:%S')
 
+        # 🚨 ¡ESTA ES LA PARTE IMPORTANTE! Ordenar las condiciones de más grave a menos grave.
         conditions = [
-            df_copy['tiene_permiso'] == True,
-            (df_copy['horas_esperadas'].dt.total_seconds() == 0) & (df_copy['checados_count'] == 0),
+            # 1. Falta (Máxima prioridad, ROJO)
             df_copy['falta'] == 1,
-            (df_copy['retardo'] == 1) & (df_copy['duration'] >= df_copy['horas_esperadas']),
-            (first_check - entry_schedule).dt.total_seconds() > (30 * 60),
-            df_copy['retardo'] == 1,
+            # 2. Retardo Mayor (ROJO: Retardo de más de 30 minutos)
+            (first_check - entry_schedule).dt.total_seconds() > (30 * 60), 
+            # 3. Salida Anticipada (ROJO/NARANJA)
             df_copy['salida_anticipada'] == 1,
+            # 4. Retardo Normal (AMARILLO: Cualquier otro retardo, que no fue mayor de 30 min)
+            df_copy['retardo'] == 1,           
+            # 5. Permiso (NARANJA PÁLIDO)
+            df_copy['tiene_permiso'] == True, 
+            # 6. Descanso (MORADO)
+            (df_copy['horas_esperadas'].dt.total_seconds() == 0) & (df_copy['checados_count'] == 0), 
+            # 7. Cumplió con horas (VERDE/BLANCO - cuando sí se cumplió la jornada a pesar del retardo)
+            (df_copy['retardo'] == 1) & (df_copy['duration'] >= df_copy['horas_esperadas']), 
         ]
-        choices = ['Permiso', 'Descanso', 'Falta', 'Cumplió con horas', 'Retardo Mayor', 'Retardo Normal', 'Salida Anticipada']
+        
+        choices = ['Falta', 'Retardo Mayor', 'Salida Anticipada', 'Retardo Normal', 'Permiso', 'Descanso', 'Cumplió con horas']
+        
         df_copy['observacion_incidencia'] = np.select(conditions, choices, default='OK')
         return df_copy
-
+    
     def procesar_reporte_detalle(self, checkin_data, permisos_dict, start_date, end_date, employee_codes=None):
         df_checadas_original = pd.DataFrame(checkin_data) if checkin_data else pd.DataFrame(columns=['employee', 'time'])
         if not df_checadas_original.empty and 'time' in df_checadas_original.columns:
@@ -376,62 +388,192 @@ class AttendanceProcessor:
         df_detalle.fillna('-', inplace=True)
         return df_detalle
 
-#Grafica General
+# --- FUNCIONES PARA GRÁFICA GENERAL (MODIFICADAS) ---
+
 def calcular_metricas_adicionales(df_resumen: pd.DataFrame, df_detalle: pd.DataFrame) -> pd.DataFrame:
     """
-    Calcula métricas adicionales como Eficiencia, Puntualidad y Bradford por empleado.
+    Combina la robustez de la versión original con los NUEVOS cálculos de SIC del compañero.
+    Asegura el renombrado a ESPAÑOL al final.
     """
-    if df_resumen.empty or df_detalle.empty:
-        return df_resumen
+    columnas_finales = ['ID', 'Nombre', 'Faltas', 'Puntualidad (%)', 'Eficiencia (%)',
+                'SIC', 'Sucursal', 'dias_laborables', 'Tasa Ausentismo (%)', 'Índice Puntualidad (%)', 'Eficiencia Horas (%)',
+                'Faltas Justificadas'] # <-- ¡AÑADIR ESTA COLUMNA!
+    df_resumen_final_vacio = pd.DataFrame(columns=columnas_finales)
 
-    # 1. Calcular Eficiencia
-    # Convertimos a segundos, manejando división por cero
-    total_horas_trabajadas_s = df_resumen['total_horas_trabajadas_td'].dt.total_seconds()
-    total_horas_netas_s = df_resumen['total_horas_td'].dt.total_seconds()
-    df_resumen['efficiency'] = (total_horas_trabajadas_s / total_horas_netas_s * 100).fillna(0)
-    df_resumen['efficiency'] = df_resumen['efficiency'].clip(0, 100) # Aseguramos que no pase de 100%
+    if df_resumen is None or df_detalle is None or df_resumen.empty or df_detalle.empty:
+        print("[WARN] df_resumen o df_detalle es None o vacío.")
+        return df_resumen_final_vacio
 
-    # 2. Calcular Puntualidad
-    # Contar días laborables por empleado desde el df_detalle
-    dias_laborables = df_detalle[df_detalle['horas_esperadas'].dt.total_seconds() > 0].groupby('employee').size()
-    dias_laborables.name = 'dias_laborables'
-    df_resumen = df_resumen.merge(dias_laborables, on='employee', how='left').fillna(0)
+    required_cols_resumen = ['employee', 'total_horas_trabajadas_td', 'total_horas_td',
+                             'total_retardos', 'faltas_del_periodo', 'episodios_ausencia',
+                             'total_salidas_anticipadas', 'faltas_justificadas', # Añadidas del compañero
+                             'Sucursal', 'Nombre']
+    required_cols_detalle = ['employee', 'horas_esperadas']
     
-    # Puntualidad = (Días laborables - retardos) / Días laborables
-    df_resumen['punctuality'] = ((df_resumen['dias_laborables'] - df_resumen['total_retardos']) / df_resumen['dias_laborables'] * 100).fillna(100)
-    df_resumen['punctuality'] = df_resumen['punctuality'].clip(0, 100)
+    # 1. Validación de columnas (versión más estricta/segura)
+    missing_resumen_cols = [col for col in required_cols_resumen if col not in df_resumen.columns]
+    missing_detalle_cols = [col for col in required_cols_detalle if col not in df_detalle.columns]
 
-    # 3. Calcular Factor Bradford
-    # B = S^2 * D (S=episodios de ausencia, D=días totales de ausencia)
-    df_resumen['bradford_factor'] = (df_resumen['episodios_ausencia'] ** 2) * df_resumen['faltas_del_periodo']
+    if missing_resumen_cols:
+        print(f"[WARN] Faltan columnas en df_resumen: {missing_resumen_cols}. Retornando vacío.")
+        return df_resumen_final_vacio
+    if missing_detalle_cols:
+         print(f"[WARN] Faltan columnas en df_detalle: {missing_detalle_cols}. Retornando vacío.")
+         return df_resumen_final_vacio
+    
+    df_resumen_calc = df_resumen.copy()
+    df_detalle_calc = df_detalle.copy()
 
-    return df_resumen
+    # Asegurar tipos de datos antes del cálculo
+    df_resumen_calc['total_horas_trabajadas_td'] = pd.to_timedelta(df_resumen_calc['total_horas_trabajadas_td'], errors='coerce').fillna(pd.Timedelta(0))
+    df_resumen_calc['total_horas_td'] = pd.to_timedelta(df_resumen_calc['total_horas_td'], errors='coerce').fillna(pd.Timedelta(0))
+    df_resumen_calc['total_retardos'] = pd.to_numeric(df_resumen_calc['total_retardos'], errors='coerce').fillna(0)
+    df_resumen_calc['faltas_del_periodo'] = pd.to_numeric(df_resumen_calc['faltas_del_periodo'], errors='coerce').fillna(0)
+    df_resumen_calc['total_salidas_anticipadas'] = pd.to_numeric(df_resumen_calc['total_salidas_anticipadas'], errors='coerce').fillna(0)
+    df_resumen_calc['episodios_ausencia'] = pd.to_numeric(df_resumen_calc['episodios_ausencia'], errors='coerce').fillna(0)
+    
+    if not pd.api.types.is_timedelta64_dtype(df_detalle_calc['horas_esperadas']):
+        df_detalle_calc['horas_esperadas'] = pd.to_timedelta(df_detalle_calc['horas_esperadas'], errors='coerce').fillna(pd.Timedelta(0))
+
+    # --- 2. Contar días laborables ---
+    dias_laborables = df_detalle_calc[df_detalle_calc['horas_esperadas'].dt.total_seconds() > 0].groupby('employee').size()
+    dias_laborables.name = 'dias_laborables'
+    df_resumen_calc['employee'] = df_resumen_calc['employee'].astype(str)
+    dias_laborables.index = dias_laborables.index.astype(str)
+    df_resumen_calc = df_resumen_calc.merge(dias_laborables, on='employee', how='left')
+    df_resumen_calc['dias_laborables'] = df_resumen_calc['dias_laborables'].fillna(0).astype(int)
+    mask_dlp = df_resumen_calc['dias_laborables'] > 0 # Máscara para días laborables > 0
+
+    # --- 3. Calcular Eficiencia (`efficiency` / `Eficiencia Horas (%)`) ---
+    total_horas_trabajadas_s = df_resumen_calc['total_horas_trabajadas_td'].dt.total_seconds()
+    total_horas_netas_s = df_resumen_calc['total_horas_td'].dt.total_seconds()
+    df_resumen_calc['efficiency'] = 100.0
+    mask_hnp = total_horas_netas_s > 0
+    if mask_hnp.any():
+        df_resumen_calc.loc[mask_hnp, 'efficiency'] = np.divide(
+            total_horas_trabajadas_s[mask_hnp], total_horas_netas_s[mask_hnp],
+            out=np.full_like(total_horas_trabajadas_s[mask_hnp], 100.0), where=total_horas_netas_s[mask_hnp]!=0
+        ) * 100
+    df_resumen_calc['efficiency'] = df_resumen_calc['efficiency'].fillna(100) #.clip(0, 150)
+
+    # --- 4. Calcular Puntualidad (`punctuality` / `Índice Puntualidad (%)`) ---
+    df_resumen_calc['punctuality'] = 100.0
+    if mask_dlp.any():
+        denom = df_resumen_calc.loc[mask_dlp, 'dias_laborables'].astype(float)
+        # Usamos total_retardos (ya es numérico)
+        numer = denom - df_resumen_calc.loc[mask_dlp, 'total_retardos'].astype(float)
+        df_resumen_calc.loc[mask_dlp, 'punctuality'] = np.divide(numer.clip(lower=0), denom, out=np.full_like(numer, 100.0), where=denom!=0) * 100
+    df_resumen_calc['punctuality'] = df_resumen_calc['punctuality'].fillna(100).clip(0, 100)
+
+    # --- 5. Calcular SIC (NUEVO CÁLCULO del compañero) ---
+    # (Días Laborables - Faltas - Retardos - Salidas Anticipadas) / Días Laborables
+    
+    # ===================== INICIA CORRECCIÓN =====================
+    df_resumen_calc['sic'] = 100.0
+    if mask_dlp.any():
+        # Filtra todas las series con mask_dlp ANTES de calcular
+        denom = df_resumen_calc.loc[mask_dlp, 'dias_laborables'].astype(float)
+        
+        # Filtra también los componentes del numerador
+        faltas = df_resumen_calc.loc[mask_dlp, 'faltas_del_periodo']
+        retardos = df_resumen_calc.loc[mask_dlp, 'total_retardos']
+        salidas = df_resumen_calc.loc[mask_dlp, 'total_salidas_anticipadas']
+        
+        numer = denom - (faltas + retardos + salidas)
+        
+        # Ahora 'numer' y 'denom' tienen el mismo tamaño (el de mask_dlp)
+        df_resumen_calc.loc[mask_dlp, 'sic'] = np.divide(numer.clip(lower=0), denom, out=np.full_like(numer, 100.0), where=denom!=0) * 100
+    # ===================== TERMINA CORRECCIÓN ====================
+    
+    df_resumen_calc['sic'] = df_resumen_calc['sic'].fillna(100).clip(0, 100)
+
+    # --- 6. Tasa de Ausentismo (Métrica nueva para el front) ---
+    # Faltas del Periodo / Días Laborables
+    df_resumen_calc['tasa_ausentismo'] = 0.0
+    if mask_dlp.any():
+        denom = df_resumen_calc.loc[mask_dlp, 'dias_laborables'].astype(float)
+        numer = df_resumen_calc.loc[mask_dlp, 'faltas_del_periodo'].astype(float)
+        df_resumen_calc.loc[mask_dlp, 'tasa_ausentismo'] = np.divide(numer, denom, out=np.zeros_like(numer), where=denom!=0) * 100
+    df_resumen_calc['tasa_ausentismo'] = df_resumen_calc['tasa_ausentismo'].fillna(0).clip(0, 100)
+    
+    # Productividad
+    df_resumen_calc['productivity'] = df_resumen_calc['efficiency']
+
+    # --- 7. Redondeo y Renombrado (para la compatibilidad con tu código) ---
+    for col in ['efficiency', 'punctuality', 'sic', 'productivity', 'tasa_ausentismo']:
+         if col in df_resumen_calc.columns: df_resumen_calc[col] = df_resumen_calc[col].round(1)
+
+    rename_map = {
+         'employee': 'ID', 
+         'Nombre': 'Nombre', 
+         'faltas_del_periodo': 'Faltas',
+         'tasa_ausentismo': 'Tasa Ausentismo (%)', # Nueva
+         'punctuality': 'Puntualidad (%)', 
+         'efficiency': 'Eficiencia (%)',
+         'punctuality': 'Índice Puntualidad (%)', # El que usa la tabla de KPIs
+         'efficiency': 'Eficiencia Horas (%)', # El que usa la tabla de KPIs
+         'sic': 'SIC', 
+         'Sucursal': 'Sucursal', 
+         'dias_laborables': 'dias_laborables',
+         'total_retardos': 'Retardos',
+         'faltas_justificadas': 'Faltas Justificadas',
+    }
+    
+    # Aplicamos el renombramiento
+    cols_to_rename = {k: v for k, v in rename_map.items() if k in df_resumen_calc.columns}
+    df_resumen_final = df_resumen_calc.rename(columns=cols_to_rename)
+    
+    # Asegurar que todas las columnas finales existan, si no, crear con valor por defecto
+    for col in columnas_finales:
+        if col not in df_resumen_final.columns:
+            if col in ['Faltas', 'dias_laborables']: df_resumen_final[col] = 0
+            elif col in ['Puntualidad (%)', 'Eficiencia (%)', 'SIC', 'Tasa Ausentismo (%)', 'Índice Puntualidad (%)', 'Eficiencia Horas (%)']: df_resumen_final[col] = 0.0
+            else: df_resumen_final[col] = 'N/A'
+
+    # Seleccionar y retornar las columnas necesarias para el front (Tablas y Gráficas)
+    return df_resumen_final[list(set(df_resumen_final.columns).intersection(set(columnas_finales)))]
 
 
 def agregar_datos_dashboard_por_sucursal(df_metricas: pd.DataFrame) -> List[Dict]:
     """
     Agrupa el DataFrame con métricas por sucursal y calcula los KPIs para el dashboard.
+    Acepta los nombres de columna en ESPAÑOL generados por la función anterior.
     """
-    if df_metricas.empty or 'Sucursal' not in df_metricas.columns:
+    col_id = 'ID'
+    col_eficiencia = 'Eficiencia Horas (%)' # Usamos el nombre en español del KPI
+    col_puntualidad = 'Índice Puntualidad (%)' # Usamos el nombre en español del KPI
+    col_sic = 'SIC'
+    col_faltas_injustificadas = 'Faltas' # Faltas del periodo (injustificadas)
+    col_faltas_justificadas = 'Faltas Justificadas' # Añadida por el compañero
+    col_sucursal = 'Sucursal'
+
+    required_cols_for_grouping = [col_id, col_eficiencia, col_puntualidad, col_sic, col_faltas_injustificadas, col_sucursal, col_faltas_justificadas]
+    
+    if df_metricas is None or df_metricas.empty or not all(col in df_metricas.columns for col in required_cols_for_grouping):
+        # Muestra una advertencia si faltan columnas
+        missing = [col for col in required_cols_for_grouping if col not in (df_metricas.columns if df_metricas is not None else [])]
+        print(f"[WARN] Faltan columnas en df_metricas para agrupar: {missing}. Retornando lista vacía.")
         return []
 
-    # Agrupar por sucursal y agregar los datos
-    df_sucursales = df_metricas.groupby('Sucursal').agg(
-        employees=('employee', 'count'),
-        efficiency=('efficiency', 'mean'),
-        punctuality=('punctuality', 'mean'),
-        avgBradford=('bradford_factor', 'mean'),
-        absences=('faltas_del_periodo', 'sum')
+    df_sucursales = df_metricas.groupby(col_sucursal).agg(
+        employees=(col_id, 'count'),
+        efficiency=(col_eficiencia, 'mean'),
+        punctuality=(col_puntualidad, 'mean'),
+        avgSIC=(col_sic, 'mean'),
+        absences=(col_faltas_injustificadas, 'sum'), # Faltas Injustificadas
+        total_justified_absences=(col_faltas_justificadas, 'sum') # NUEVO KPI
     ).reset_index()
 
-    # Renombrar la columna 'Sucursal' a 'name' para que coincida con el JS
-    df_sucursales.rename(columns={'Sucursal': 'name'}, inplace=True)
-    
-    # Añadimos un SIC promedio (usando eficiencia como proxy, ya que no está definido)
-    df_sucursales['avgSIC'] = df_sucursales['efficiency']
-    
-    # Formatear a dos decimales y convertir a lista de diccionarios
-    for col in ['efficiency', 'punctuality', 'avgBradford', 'avgSIC']:
-        df_sucursales[col] = df_sucursales[col].round(2)
-        
+    df_sucursales.rename(columns={col_sucursal: 'name'}, inplace=True)
+    df_sucursales['productivity'] = df_sucursales['efficiency'] # Se asume proxy
+
+    # Redondeo final para los KPIs
+    for col in ['efficiency', 'punctuality', 'avgSIC', 'productivity']:
+        if col in df_sucursales.columns:
+            df_sucursales[col] = df_sucursales[col].round(1) # Redondeo a 1 decimal
+
+    df_sucursales['employees'] = df_sucursales['employees'].astype(int)
+    df_sucursales['absences'] = df_sucursales['absences'].astype(int)
+    df_sucursales['total_justified_absences'] = df_sucursales['total_justified_absences'].astype(int)
+
     return df_sucursales.to_dict('records')
