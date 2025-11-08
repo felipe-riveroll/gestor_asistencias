@@ -23,4 +23,10 @@ urlpatterns = [
     path("grafica_general/", views.grafica_general, name="grafica_general"),
     path("api/dashboard/general/", views.api_dashboard_general, name="api_dashboard_general"),
     path('api/exportar_excel_con_colores/', views.exportar_excel_con_colores, name='exportar_excel_con_colores'),
+    path("grafica_31pte/",views.grafica_31pte,name='grafica_31pte'),
+    path('api/dashboard/31pte/', views.api_dashboard_31pte, name='api-dashboard-31pte'),
+    path("grafica_villas/",views.grafica_villas,name='grafica_villas'),
+    path('api/dashboard/villas/', views.api_dashboard_villas, name='api-dashboard-villas'),
+    path("grafica_nave/",views.grafica_nave,name='grafica_nave'),
+    path('api/dashboard/nave/', views.api_dashboard_nave, name='api-dashboard-nave'),
 ]

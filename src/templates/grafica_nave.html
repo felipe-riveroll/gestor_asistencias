@@ -4,10 +4,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard General - Recursos Humanos</title>
+    <title>Dashboard Nave - Recursos Humanos</title>
     <link rel="icon" href="{% static 'img/logo.png' %}" type="image/png">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <link rel="stylesheet" href="{% static 'css/grafica_general.css' %}?v=5"> 
+    <link rel="stylesheet" href="{% static 'css/grafica_nave.css' %}?v=5"> 
     <link href="https://fonts.googleapis.com/css2?family=Varela+Round&display=swap" rel="stylesheet" />
 </head>
 <body>
@@ -83,7 +83,7 @@
 
         <main class="content-area">
             <div class="dashboard-header">
-                <h1 class="dashboard-title"><i class="fa-solid fa-chart-line"></i> Dashboard General</h1>
+                <h1 class="dashboard-title"><i class="fa-solid fa-chart-line"></i> Dashboard: Sucursal Nave</h1>
                 <div class="header-actions">
                     <button id="exportExcelBtn" class="export-btn"><i class="fa-solid fa-file-excel"></i> Exportar a Excel</button>
                 </div>
@@ -120,25 +120,43 @@
 
             <div class="dashboard-content" id="dashboardContent" style="display: none;">
 
-                 <div class="main-kpis">
+                <div class="main-kpis">
                      <div class="kpi-card primary"><div class="kpi-icon"><i class="fa-solid fa-users"></i></div><div class="kpi-content"><div class="kpi-value" id="totalEmployees">0</div><div class="kpi-label">Total Empleados</div></div></div>
                      <div class="kpi-card success"><div class="kpi-icon"><i class="fa-solid fa-chart-line"></i></div><div class="kpi-content"><div class="kpi-value" id="avgEfficiency">0%</div><div class="kpi-label">Eficiencia Promedio</div></div></div>
                      <div class="kpi-card warning"><div class="kpi-icon"><i class="fa-solid fa-clock"></i></div><div class="kpi-content"><div class="kpi-value" id="avgPunctuality">0%</div><div class="kpi-label">Puntualidad Promedio</div></div></div>
                      <div class="kpi-card danger"><div class="kpi-icon"><i class="fa-solid fa-user-xmark"></i></div><div class="kpi-content"><div class="kpi-value" id="totalAbsences">0</div><div class="kpi-label">Ausencias Totales</div></div></div>
                  </div>
 
-                 <div class="charts-section">
-                     <div class="chart-row"><div class="chart-card large"><div class="chart-header"><h3>Eficiencia por Sucursal</h3></div><div class="chart-container"><canvas id="branchEfficiencyChart"></canvas></div></div></div>
-                     <div class="chart-row"><div class="chart-card"><div class="chart-header"><h3>Distribución de SIC</h3></div><div class="chart-container"><canvas id="sicDistributionChart"></canvas></div></div><div class="chart-card"><div class="chart-header"><h3>Resumen del Periodo</h3></div><div class="chart-container"><canvas id="periodEventsChart"></canvas></div></div></div>
-                     <div class="chart-row"><div class="chart-card"><div class="chart-header"><h3>Top 10 - Eficiencia</h3></div><div class="chart-container"><canvas id="topEfficiencyChart"></canvas></div></div><div class="chart-card"><div class="chart-header"><h3>Comparativa por Sucursal</h3></div><div class="chart-container"><canvas id="branchComparisonChart"></canvas></div></div></div>
+                <div class="charts-section">
+                     <div class="chart-row">
+                         <div class="chart-card large">
+                             <div class="chart-header"><h3>Resumen del Periodo (Nave)</h3></div>
+                             <div class="chart-container"><canvas id="periodEventsChart"></canvas></div>
+                         </div>
+                     </div>
+                     <div class="chart-row">
+                         <div class="chart-card">
+                             <div class="chart-header"><h3>Distribución de SIC (Empleados de Nave)</h3></div>
+                             <div class="chart-container"><canvas id="sicDistributionChart"></canvas></div>
+                         </div>
+                         <div class="chart-card">
+                             <div class="chart-header"><h3>Top Empleados por Eficiencia</h3></div>
+                             <div class="chart-container"><canvas id="topEfficiencyChart"></canvas></div>
+                         </div>
+                     </div>
+                     
+                     <div class="chart-row" style="display: none;">
+                         <div class="chart-card"><div class="chart-header"><h3>Eficiencia (Nave)</h3></div><div class="chart-container"><canvas id="branchEfficiencyChart"></canvas></div></div>
+                         <div class="chart-card"><div class="chart-header"><h3>Comparativa</h3></div><div class="chart-container"><canvas id="branchComparisonChart"></canvas></div></div>
+                     </div>
+                 </div>
+                 
+                 <div class="table-section" style="display: none;">
+                    <div class="section-header"><h3>Resumen por Sucursal</h3> </div>
+                    <div class="table-container"><table id="summaryTable"><thead><tr><th>Sucursal</th><th>Empleados</th><th>Eficiencia</th><th>Puntualidad</th><th>SIC Promedio</th><th>Ausencias</th></tr></thead><tbody id="summaryTableBody"></tbody></table></div>
                  </div>
 
-                 <div class="table-section">
-                     <div class="section-header"><h3>Resumen por Sucursal</h3> </div>
-                     <div class="table-container"><table id="summaryTable"><thead><tr><th>Sucursal</th><th>Empleados</th><th>Eficiencia</th><th>Puntualidad</th><th>SIC Promedio</th><th>Ausencias</th></tr></thead><tbody id="summaryTableBody"></tbody></table></div>
-                 </div>
-
-                 <div class="table-tabs-section">
+                <div class="table-tabs-section">
                      <div class="tab-buttons">
                          <button class="tab-button active" data-tab="summary">Resumen Horas</button>
                          <button class="tab-button" data-tab="kpis">KPIs Rendimiento</button>
@@ -152,7 +170,7 @@
                      <div class="tab-content-container">
                          <div class="tab-content active" id="summary">
                              <div class="table-section">
-                                 <div class="section-header"><h3>Resumen de Horas por Empleado</h3></div>
+                                 <div class="section-header"><h3>Resumen de Horas por Empleado (Nave)</h3></div>
                                  <div class="table-container">
                                      <table id="employeeSummaryTable">
                                          <thead><tr><th>ID</th><th>Empleado</th><th>Hrs. Trabajadas</th><th>Hrs. Planificadas</th><th>Variación</th><th>Retardos</th><th>Ausencias</th></tr></thead>
@@ -163,7 +181,7 @@
                          </div>
                          <div class="tab-content" id="kpis">
                              <div class="table-section employee-kpi-section">
-                                 <div class="section-header"><h3>Indicadores de Rendimiento Individual</h3></div>
+                                 <div class="section-header"><h3>Indicadores de Rendimiento Individual (Nave)</h3></div>
                                  <div class="table-container">
                                      <table id="employeeKpiTable">
                                          <thead>
@@ -179,10 +197,15 @@
                                  </div>
                              </div>
                          </div>
-                     </div> </div> </div> </main>
-    </div> <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+                     </div>
+                </div>
+            </div>
+        </main>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
-    <script src="{% static 'js/grafica_general.js' %}"></script>
+    
+    <script src="{% static 'js/grafica_nave.js' %}"></script>
 </body>
 </html>
