@@ -17,7 +17,7 @@ from openpyxl.utils import get_column_letter
 # Imports de tus propios archivos de la aplicación
 from .services import autenticar_usuario, crear_empleado_service, crear_horario_service
 from .models import Sucursal, Horario, Empleado
-from .main import generar_reporte_completo, generar_reporte_detalle_completo, generar_datos_dashboard_general
+from .main import generar_reporte_completo, generar_reporte_detalle_completo, generar_datos_dashboard_general,generar_datos_dashboard_31pte,generar_datos_dashboard_villas,generar_datos_dashboard_nave
  
 def inicio(request):
     return render(request, 'login.html')
@@ -570,3 +570,69 @@ def export_dashboard_excel(request):
             'timestamp': str(timezone.now()) 
         }
     }, status=405)
+
+#31pte
+@login_required
+def grafica_31pte(request):
+    return render(request, "grafica_31pte.html")
+
+@login_required
+@require_http_methods(["GET"])
+def api_dashboard_31pte(request):
+    """API para proveer datos SOLAMENTE a 31pte."""
+    try:
+        start_date = request.GET.get("startDate")
+        end_date = request.GET.get("endDate")
+        if not start_date or not end_date:
+            return JsonResponse({"success": False, "error": "Fechas de inicio y fin son requeridas."}, status=400)
+        
+        # Llama a la nueva función específica de 31pte
+        resultado = generar_datos_dashboard_31pte(start_date=start_date, end_date=end_date)
+        return JsonResponse(resultado)
+
+    except Exception as e:
+        return JsonResponse({"success": False, "error": f"Error interno del servidor: {str(e)}"}, status=500)
+
+#Villas
+@login_required
+def grafica_villas(request):
+    return render(request, "grafica_villas.html")
+
+@login_required
+@require_http_methods(["GET"])
+def api_dashboard_villas(request):
+    """API para proveer datos SOLAMENTE a Villas."""
+    try:
+        start_date = request.GET.get("startDate")
+        end_date = request.GET.get("endDate")
+        if not start_date or not end_date:
+            return JsonResponse({"success": False, "error": "Fechas de inicio y fin son requeridas."}, status=400)
+        
+        # Llama a la nueva función específica de Villas
+        resultado = generar_datos_dashboard_villas(start_date=start_date, end_date=end_date)
+        return JsonResponse(resultado)
+
+    except Exception as e:
+        return JsonResponse({"success": False, "error": f"Error interno del servidor: {str(e)}"}, status=500)
+
+#Nave
+@login_required
+def grafica_nave(request):
+    return render(request, "grafica_nave.html")
+
+@login_required
+@require_http_methods(["GET"])
+def api_dashboard_nave(request):
+    """API para proveer datos SOLAMENTE a Nave."""
+    try:
+        start_date = request.GET.get("startDate")
+        end_date = request.GET.get("endDate")
+        if not start_date or not end_date:
+            return JsonResponse({"success": False, "error": "Fechas de inicio y fin son requeridas."}, status=400)
+        
+        # Llama a la nueva función específica de Nave
+        resultado = generar_datos_dashboard_nave(start_date=start_date, end_date=end_date)
+        return JsonResponse(resultado)
+
+    except Exception as e:
+        return JsonResponse({"success": False, "error": f"Error interno del servidor: {str(e)}"}, status=500)
