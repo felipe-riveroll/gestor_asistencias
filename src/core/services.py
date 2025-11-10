@@ -117,15 +117,178 @@ def crear_horario_service(data):
         descripcion_horario=data.get("descripcionHorario") or "",
     )
 
+# services.py (Completo y Corregido)
+
+# Imports de Python y librerías externas
+from datetime import datetime, timedelta, time
+from itertools import product
+import pandas as pd
+from typing import Dict, List, Tuple
+import numpy as np
+
+# Imports de Django
+from django.contrib.auth import authenticate
+from django.contrib.auth.models import User
+
+# Imports de tus propios archivos de la aplicación
+from .models import Empleado, AsignacionHorario, Sucursal, Horario, DiaSemana
+from .config import (
+    TOLERANCIA_SALIDA_ANTICIPADA_MINUTOS,
+    TOLERANCIA_RETARDO_MINUTOS,
+    DIAS_ESPANOL,
+)
+from .utils import td_to_str
+from .db_postgres_connection import obtener_horario_empleado_completo
+
+
+# --- INICIA CORRECCIÓN 1: NUEVA FUNCIÓN AUXILIAR ---
+def map_device_to_sucursal(device_id_str: str) -> str:
+    """
+    Convierte un 'device_id' (texto) en un nombre de Sucursal estandarizado.
+    """
+    if device_id_str is None:
+        return 'Desconocida'
+        
+    device_id = str(device_id_str).lower()
+    
+    # Mapeo basado en los patrones de tu api_client
+    if 'villas' in device_id or 'vlla' in device_id:
+        return 'Villas'
+    if '31pte' in device_id or '31' in device_id or 'pte' in device_id:
+        return '31pte'
+    if 'nave' in device_id or 'nav' in device_id:
+        return 'Nave'
+    if 'rioblanco' in device_id or 'rio' in device_id or 'blanco' in device_id:
+        return 'RioBlanco'
+        
+    # Fallback por si el device_id no coincide con los patrones conocidos
+    return 'Desconocida'
+# --- FIN CORRECCIÓN 1 ---
+
+
+def autenticar_usuario(request, email, password):
+    try:
+        user_obj = User.objects.get(email=email)
+        user = authenticate(request, username=user_obj.username, password=password)
+        return user
+    except User.DoesNotExist:
+        return None
+
+def crear_empleado_service(data):
+    print("[DEBUG] POST crudo:", dict(data))
+
+    # 1. Crear empleado
+    empleado = Empleado.objects.create(
+        codigo_frappe=data.get("codigoFrappe"),
+        codigo_checador=data.get("codigoChecador"),
+        nombre=data.get("nombre"),
+        apellido_paterno=data.get("primerApellido"),
+        apellido_materno=data.get("segundoApellido"),
+        email=data.get("email"),
+        tiene_horario_asignado=True
+    )
+    print(f"[DEBUG] Empleado creado -> empleado_id: {empleado.empleado_id}, Nombre: {empleado.nombre}")
+
+    # 2. Recuperar listas de asignaciones desde el POST
+    sucursales = data.getlist("sucursales[]")
+    horarios = data.getlist("horarios[]")
+    dias = data.getlist("dias[]")
+
+    print("[DEBUG] Sucursales recibidas:", sucursales)
+    print("[DEBUG] Horarios recibidos:", horarios)
+    print("[DEBUG] Días recibidos:", dias)
+
+    if not sucursales or not horarios or not dias:
+        print("[ERROR] No llegaron datos de horarios/sucursales/días")
+        return empleado
+    
+    # 3. Crear asignaciones de horarios
+    for sucursal_id, horario_id, dias_str in zip(sucursales, horarios, dias):
+        print(f"[DEBUG] Procesando sucursal={sucursal_id}, horario={horario_id}, dias={dias_str}")
+
+        try:     
+            
+            horario_obj = Horario.objects.get(pk=int(horario_id))
+        except Horario.DoesNotExist:
+            print(f"[ERROR] Horario con ID {horario_id} no existe")
+            continue
+
+        print(f"[DEBUG] Horario -> Entrada: {horario_obj.hora_entrada}, "
+              f"Salida: {horario_obj.hora_salida}, Cruza medianoche: {horario_obj.cruza_medianoche}")
+
+        dias_list = dias_str.split(",")  # ej: "1,2,3"
+        for dia in dias_list:
+            print(
+                f"[DEBUG] Insertando AsignacionHorario -> empleado={empleado.empleado_id}, "
+                f"sucursal={sucursal_id}, horario={horario_id}, dia_especifico={dia}, "
+                f"entrada={horario_obj.hora_entrada}, salida={horario_obj.hora_salida}, "
+                f"cruza={horario_obj.cruza_medianoche}"
+            )
+            AsignacionHorario.objects.create(
+                empleado=empleado,
+                sucursal_id=int(sucursal_id),
+                horario=horario_obj,
+                dia_especifico_id=int(dia),
+                hora_entrada_especifica=horario_obj.hora_entrada,
+                hora_salida_especifica=horario_obj.hora_salida,
+                hora_salida_especifica_cruza_medianoche=horario_obj.cruza_medianoche,
+            )
+    return empleado
+
+def listar_empleados():
+
+    empleados = Empleado.objects.select_related("empleado", "sucursal", "horario").all()
+
+    # Creamos una lista de diccionarios para usar en el template
+    lista_empleados = []
+    for a in empleados:
+        lista_empleados.append(
+            {
+                "empleado_id": a.empleado.empleado_id,
+                "nombre": a.empleado.nombre,
+                "apellido_paterno": a.empleado.apellido_paterno,
+                "apellido_materno": a.empleado.apellido_materno,
+                "email": a.empleado.email,
+                "codigo_frappe": a.empleado.codigo_frappe,
+                "codigo_checador": a.empleado.codigo_checador,
+            }
+        )
+    return lista_empleados
+
+def crear_horario_service(data):
+    return Horario.objects.create(
+        hora_entrada=data.get("horaEntrada"),
+        hora_salida=data.get("horaSalida"),
+        cruza_medianoche=True if data.get("cruzaNoche") == "si" else False,
+        descripcion_horario=data.get("descripcionHorario") or "",
+    )
+
 #Reporte de Horas y Lista de Asistencias
 class AttendanceProcessor:
+    
+    # --- INICIA CORRECCIÓN 2: process_checkins_to_dataframe ---
     def process_checkins_to_dataframe(self, checkin_data, start_date, end_date, employee_codes=None):
-        df = pd.DataFrame(checkin_data) if checkin_data else pd.DataFrame(columns=['employee', 'time'])
+        df = pd.DataFrame(checkin_data) if checkin_data else pd.DataFrame(columns=['employee', 'time', 'device_id'])
+        
         if 'time' in df.columns and not df.empty:
             df["time"] = pd.to_datetime(df["time"])
             df["dia"] = df["time"].dt.date
             df["checado_time"] = df["time"].dt.time
-        
+            
+            # Si 'device_id' no vino en la data (aunque debería), créalo vacío
+            if 'device_id' not in df.columns:
+                df['device_id'] = None
+                
+            # Usa la función de mapeo para crear la columna SUCURSAL
+            # ¡Esta es la corrección clave!
+            df['Sucursal'] = df['device_id'].apply(map_device_to_sucursal)
+            
+        else:
+             # Asegura que las columnas existan si el df de checkin_data estaba vacío
+            if 'device_id' not in df.columns: df['device_id'] = None
+            if 'Sucursal' not in df.columns: df['Sucursal'] = None
+
+
         all_employees = employee_codes if employee_codes else (df["employee"].unique() if not df.empty else [])
         if not all_employees: return pd.DataFrame()
 
@@ -137,17 +300,22 @@ class AttendanceProcessor:
                 checado_primero=('checado_time', 'min'),
                 checado_ultimo=('checado_time', 'max'),
                 checados_count=('time', 'count'),
+                # Agregamos 'Sucursal' y 'device_id' al agg
+                Sucursal=('Sucursal', 'first'), 
+                device_id=('device_id', 'first') 
             ).reset_index()
+            
             def calc_duration(r):
                 if r["checados_count"] < 2 or pd.isna(r['checado_primero']): return pd.Timedelta(0)
                 d = datetime(2000, 1, 1)
                 return datetime.combine(d, r['checado_ultimo']) - datetime.combine(d, r['checado_primero'])
+            
             stats["duration"] = stats.apply(calc_duration, axis=1)
             final_df = base_df.merge(stats, on=['employee', 'dia'], how='left')
         else:
             final_df = base_df
         
-        for col in ['duration', 'checados_count', 'checado_primero', 'checado_ultimo']:
+        for col in ['duration', 'checados_count', 'checado_primero', 'checado_ultimo', 'Sucursal', 'device_id']:
             if col not in final_df.columns:
                 if col == 'duration': final_df[col] = pd.Timedelta(0)
                 elif col == 'checados_count': final_df[col] = 0
@@ -156,16 +324,27 @@ class AttendanceProcessor:
         final_df['duration'] = final_df['duration'].fillna(pd.Timedelta(0))
         final_df['checados_count'] = final_df['checados_count'].fillna(0).astype(int)
         
+        # Si la sucursal quedó en Nulo después del merge (para días sin checadas),
+        # intentamos rellenarla con la última sucursal conocida de ese empleado.
+        final_df['Sucursal'] = final_df.groupby('employee')['Sucursal'].ffill().bfill()
+        final_df['Sucursal'] = final_df['Sucursal'].fillna('Sin Asignar') # Relleno final
+        
         emp_map = {str(e.codigo_frappe): f"{e.nombre} {e.apellido_paterno}" for e in Empleado.objects.filter(codigo_frappe__in=all_employees)}
         final_df['Nombre'] = final_df['employee'].map(emp_map).fillna(final_df['employee'])
         
         final_df["dia_obj"] = pd.to_datetime(final_df["dia"])
         final_df["dia_semana"] = final_df["dia_obj"].dt.day_name()
         return final_df
+    # --- FIN CORRECCIÓN 2 ---
 
+
+    # --- INICIA CORRECCIÓN 3: analizar_asistencia_con_horarios ---
     def analizar_asistencia_con_horarios(self, df: pd.DataFrame, start_date_str: str, end_date_str: str) -> pd.DataFrame:
         if df.empty: return df
-        for col in ["horas_esperadas", "horario_entrada", "horario_salida", "Sucursal"]:
+        
+        # 'Sucursal' ya existe gracias a la función anterior (process_checkins_to_dataframe)
+        # Solo necesitamos crear las otras columnas
+        for col in ["horas_esperadas", "horario_entrada", "horario_salida"]:
             if 'horas' in col: df[col] = pd.Timedelta(0)
             else: df[col] = None
 
@@ -174,13 +353,18 @@ class AttendanceProcessor:
         
         start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
         
+        # NOTA: obtener_horario_empleado_completo debe devolver el horario general del empleado,
+        # ya que la sucursal del DÍA ya la tenemos.
         horarios_periodo = {e: obtener_horario_empleado_completo(e, start_date.strftime('%Y-%m-%d')) for e in employees_to_fetch}
         
         for idx, row in df.iterrows():
             horario_emp = horarios_periodo.get(row['employee'])
             if not horario_emp or horario_emp.get('dias_con_horario', 0) == 0: continue
             
-            df.at[idx, 'Sucursal'] = horario_emp.get('sucursal', 'N/A')
+            # ¡¡ELIMINAMOS LA LÍNEA QUE ASIGNABA LA SUCURSAL!!
+            # La columna 'Sucursal' que ya está en el 'row' (la del device_id) es la que se respeta.
+            # df.at[idx, 'Sucursal'] = horario_emp.get('sucursal', 'N/A') # <-- ESTA LÍNEA SE ELIMINA O COMENTA
+
             dia_nombre = DIAS_ESPANOL.get(row['dia_semana'], "")
             dia_horario = horario_emp.get('horarios_detallados', {}).get(dia_nombre, {})
             
@@ -190,6 +374,7 @@ class AttendanceProcessor:
                 df.at[idx, 'horario_entrada'] = dia_horario.get('entrada')
                 df.at[idx, 'horario_salida'] = dia_horario.get('salida')
         return df
+    # --- FIN CORRECCIÓN 3 ---
 
     def aplicar_permisos_detallados(self, df: pd.DataFrame, permisos_dict: dict) -> pd.DataFrame:
         df['horas_permiso'] = pd.Timedelta(0); df['tiene_permiso'] = False
@@ -222,6 +407,7 @@ class AttendanceProcessor:
                     if row['checado_ultimo'] < umbral: df.at[idx, 'salida_anticipada'] = 1
         return df
 
+    # --- INICIA CORRECCIÓN 4: calcular_resumen_final (Arreglo 'col not exist') ---
     def calcular_resumen_final(self, df: pd.DataFrame) -> pd.DataFrame:
         if df.empty: return pd.DataFrame()
         
@@ -229,16 +415,26 @@ class AttendanceProcessor:
         df['falta_justificada'] = df.apply(lambda x: 1 if x['tiene_permiso'] and x['horas_permiso'] == x['horas_esperadas'] else 0, axis=1)
         df['episodio_ausencia_diario'] = df['falta'] 
 
+        # 1. Quitamos 'Sucursal' del agg_dict
         agg_dict = {
-            'Nombre': 'first', 'Sucursal': 'first', 'duration': 'sum', 'horas_esperadas': 'sum',
+            'Nombre': 'first', 
+            # 'Sucursal': 'first', # <-- SE QUITA DE AQUÍ
+            'duration': 'sum', 'horas_esperadas': 'sum',
             'horas_permiso': 'sum', 'horas_descanso': 'sum', 'falta': 'sum', 'retardo': 'sum', 'salida_anticipada': 'sum',
             'falta_justificada': 'sum', 'episodio_ausencia_diario': 'sum',
         }
-        df_resumen = df.groupby('employee').agg(agg_dict).reset_index().rename(columns={
-            'duration': 'total_horas_trabajadas_td', 'horas_esperadas': 'total_horas_esperadas_td',
-            'horas_permiso': 'total_horas_descontadas_permiso_td', 'horas_descanso': 'total_horas_descanso_td',
-            'falta': 'faltas_del_periodo', 'retardo': 'total_retardos', 
-            'salida_anticipada': 'total_salidas_anticipadas', 'falta_justificada': 'faltas_justificadas', 
+        
+        # 2. Agregamos 'Sucursal' al GROUPBY
+        # Esto crea un resumen por Empleado Y POR Sucursal
+        df_resumen = df.groupby(['employee', 'Sucursal']).agg(agg_dict).reset_index().rename(columns={
+            'duration': 'total_horas_trabajadas_td', 
+            'horas_esperadas': 'total_horas_esperadas_td', # <-- Esta es la columna que agrupa
+            'horas_permiso': 'total_horas_descontadas_permiso_td', 
+            'horas_descanso': 'total_horas_descanso_td',
+            'falta': 'faltas_del_periodo', 
+            'retardo': 'total_retardos', 
+            'salida_anticipada': 'total_salidas_anticipadas', 
+            'falta_justificada': 'faltas_justificadas', 
             'episodio_ausencia_diario': 'episodios_ausencia',
         })
         
@@ -254,11 +450,15 @@ class AttendanceProcessor:
         df_resumen['total_salidas_anticipadas'] = df_resumen['total_salidas_anticipadas'].fillna(0).astype(int)
 
         return df_resumen[['employee', 'Nombre', 'Sucursal', 'total_horas_trabajadas', 'total_horas_esperadas', 
-                            'total_horas_descontadas_permiso', 'total_horas_descanso', 'total_horas',
-                            'diferencia_HHMMSS', 'total_faltas', 'total_retardos', 'total_salidas_anticipadas',
-                            'faltas_del_periodo', 'faltas_justificadas', 'episodios_ausencia',
-                            # Columnas TD invisibles para cálculos posteriores
-                            'total_horas_trabajadas_td', 'total_horas_td']]
+                           'total_horas_descontadas_permiso', 'total_horas_descanso', 'total_horas',
+                           'diferencia_HHMMSS', 'total_faltas', 'total_retardos', 'total_salidas_anticipadas',
+                           'faltas_del_periodo', 'faltas_justificadas', 'episodios_ausencia',
+                           # Columnas TD invisibles para cálculos posteriores
+                           'total_horas_trabajadas_td', 
+                           'total_horas_esperadas_td', # <-- ESTA ES LA COLUMNA QUE FALTABA
+                           'total_horas_td']]
+    # --- FIN CORRECCIÓN 4 ---
+
 
     def calcular_descanso_real_detallado(self, df_checadas_completo: pd.DataFrame) -> pd.DataFrame:
         if df_checadas_completo.empty or 'time' not in df_checadas_completo.columns:
@@ -330,21 +530,13 @@ class AttendanceProcessor:
         first_check = pd.to_datetime(df_copy['checado_primero'].astype(str), errors='coerce', format='%H:%M:%S')
         entry_schedule = pd.to_datetime(df_copy['horario_entrada'].astype(str), errors='coerce', format='%H:%M:%S')
 
-        # 🚨 ¡ESTA ES LA PARTE IMPORTANTE! Ordenar las condiciones de más grave a menos grave.
         conditions = [
-            # 1. Falta (Máxima prioridad, ROJO)
             df_copy['falta'] == 1,
-            # 2. Retardo Mayor (ROJO: Retardo de más de 30 minutos)
             (first_check - entry_schedule).dt.total_seconds() > (30 * 60), 
-            # 3. Salida Anticipada (ROJO/NARANJA)
             df_copy['salida_anticipada'] == 1,
-            # 4. Retardo Normal (AMARILLO: Cualquier otro retardo, que no fue mayor de 30 min)
-            df_copy['retardo'] == 1,           
-            # 5. Permiso (NARANJA PÁLIDO)
+            df_copy['retardo'] == 1,       
             df_copy['tiene_permiso'] == True, 
-            # 6. Descanso (MORADO)
             (df_copy['horas_esperadas'].dt.total_seconds() == 0) & (df_copy['checados_count'] == 0), 
-            # 7. Cumplió con horas (VERDE/BLANCO - cuando sí se cumplió la jornada a pesar del retardo)
             (df_copy['retardo'] == 1) & (df_copy['duration'] >= df_copy['horas_esperadas']), 
         ]
         
@@ -390,25 +582,27 @@ class AttendanceProcessor:
 
 # --- FUNCIONES PARA GRÁFICA GENERAL (MODIFICADAS) ---
 
+# --- INICIA CORRECCIÓN 5: calcular_metricas_adicionales ---
 def calcular_metricas_adicionales(df_resumen: pd.DataFrame, df_detalle: pd.DataFrame) -> pd.DataFrame:
     """
     Combina la robustez de la versión original con los NUEVOS cálculos de SIC del compañero.
     Asegura el renombrado a ESPAÑOL al final.
     """
     columnas_finales = ['ID', 'Nombre', 'Faltas', 'Puntualidad (%)', 'Eficiencia (%)',
-                'SIC', 'Sucursal', 'dias_laborables', 'Tasa Ausentismo (%)', 'Índice Puntualidad (%)', 'Eficiencia Horas (%)',
-                'Faltas Justificadas'] # <-- ¡AÑADIR ESTA COLUMNA!
+                        'SIC', 'Sucursal', 'dias_laborables', 'Tasa Ausentismo (%)', 'Índice Puntualidad (%)', 'Eficiencia Horas (%)',
+                        'Faltas Justificadas'] 
     df_resumen_final_vacio = pd.DataFrame(columns=columnas_finales)
 
     if df_resumen is None or df_detalle is None or df_resumen.empty or df_detalle.empty:
         print("[WARN] df_resumen o df_detalle es None o vacío.")
         return df_resumen_final_vacio
 
+    # 'Sucursal' también es necesaria en df_detalle para el groupby de dias_laborables
     required_cols_resumen = ['employee', 'total_horas_trabajadas_td', 'total_horas_td',
                              'total_retardos', 'faltas_del_periodo', 'episodios_ausencia',
-                             'total_salidas_anticipadas', 'faltas_justificadas', # Añadidas del compañero
+                             'total_salidas_anticipadas', 'faltas_justificadas',
                              'Sucursal', 'Nombre']
-    required_cols_detalle = ['employee', 'horas_esperadas']
+    required_cols_detalle = ['employee', 'horas_esperadas', 'Sucursal'] 
     
     # 1. Validación de columnas (versión más estricta/segura)
     missing_resumen_cols = [col for col in required_cols_resumen if col not in df_resumen.columns]
@@ -435,12 +629,18 @@ def calcular_metricas_adicionales(df_resumen: pd.DataFrame, df_detalle: pd.DataF
     if not pd.api.types.is_timedelta64_dtype(df_detalle_calc['horas_esperadas']):
         df_detalle_calc['horas_esperadas'] = pd.to_timedelta(df_detalle_calc['horas_esperadas'], errors='coerce').fillna(pd.Timedelta(0))
 
-    # --- 2. Contar días laborables ---
-    dias_laborables = df_detalle_calc[df_detalle_calc['horas_esperadas'].dt.total_seconds() > 0].groupby('employee').size()
+    # 2. Contar días laborables (Agrupando por Empleado Y Sucursal)
+    dias_laborables = df_detalle_calc[df_detalle_calc['horas_esperadas'].dt.total_seconds() > 0].groupby(['employee', 'Sucursal']).size()
     dias_laborables.name = 'dias_laborables'
+    
+    # Asegurar que los tipos coinciden para el merge
     df_resumen_calc['employee'] = df_resumen_calc['employee'].astype(str)
-    dias_laborables.index = dias_laborables.index.astype(str)
-    df_resumen_calc = df_resumen_calc.merge(dias_laborables, on='employee', how='left')
+    df_resumen_calc['Sucursal'] = df_resumen_calc['Sucursal'].astype(str)
+    dias_laborables.index = dias_laborables.index.set_levels([dias_laborables.index.levels[0].astype(str), dias_laborables.index.levels[1].astype(str)])
+
+    # Hacer merge usando AMBAS claves
+    df_resumen_calc = df_resumen_calc.merge(dias_laborables, on=['employee', 'Sucursal'], how='left')
+
     df_resumen_calc['dias_laborables'] = df_resumen_calc['dias_laborables'].fillna(0).astype(int)
     mask_dlp = df_resumen_calc['dias_laborables'] > 0 # Máscara para días laborables > 0
 
@@ -460,35 +660,26 @@ def calcular_metricas_adicionales(df_resumen: pd.DataFrame, df_detalle: pd.DataF
     df_resumen_calc['punctuality'] = 100.0
     if mask_dlp.any():
         denom = df_resumen_calc.loc[mask_dlp, 'dias_laborables'].astype(float)
-        # Usamos total_retardos (ya es numérico)
         numer = denom - df_resumen_calc.loc[mask_dlp, 'total_retardos'].astype(float)
         df_resumen_calc.loc[mask_dlp, 'punctuality'] = np.divide(numer.clip(lower=0), denom, out=np.full_like(numer, 100.0), where=denom!=0) * 100
     df_resumen_calc['punctuality'] = df_resumen_calc['punctuality'].fillna(100).clip(0, 100)
 
     # --- 5. Calcular SIC (NUEVO CÁLCULO del compañero) ---
-    # (Días Laborables - Faltas - Retardos - Salidas Anticipadas) / Días Laborables
-    
-    # ===================== INICIA CORRECCIÓN =====================
     df_resumen_calc['sic'] = 100.0
     if mask_dlp.any():
-        # Filtra todas las series con mask_dlp ANTES de calcular
         denom = df_resumen_calc.loc[mask_dlp, 'dias_laborables'].astype(float)
         
-        # Filtra también los componentes del numerador
         faltas = df_resumen_calc.loc[mask_dlp, 'faltas_del_periodo']
         retardos = df_resumen_calc.loc[mask_dlp, 'total_retardos']
         salidas = df_resumen_calc.loc[mask_dlp, 'total_salidas_anticipadas']
         
         numer = denom - (faltas + retardos + salidas)
         
-        # Ahora 'numer' y 'denom' tienen el mismo tamaño (el de mask_dlp)
         df_resumen_calc.loc[mask_dlp, 'sic'] = np.divide(numer.clip(lower=0), denom, out=np.full_like(numer, 100.0), where=denom!=0) * 100
-    # ===================== TERMINA CORRECCIÓN ====================
     
     df_resumen_calc['sic'] = df_resumen_calc['sic'].fillna(100).clip(0, 100)
 
     # --- 6. Tasa de Ausentismo (Métrica nueva para el front) ---
-    # Faltas del Periodo / Días Laborables
     df_resumen_calc['tasa_ausentismo'] = 0.0
     if mask_dlp.any():
         denom = df_resumen_calc.loc[mask_dlp, 'dias_laborables'].astype(float)
@@ -496,7 +687,6 @@ def calcular_metricas_adicionales(df_resumen: pd.DataFrame, df_detalle: pd.DataF
         df_resumen_calc.loc[mask_dlp, 'tasa_ausentismo'] = np.divide(numer, denom, out=np.zeros_like(numer), where=denom!=0) * 100
     df_resumen_calc['tasa_ausentismo'] = df_resumen_calc['tasa_ausentismo'].fillna(0).clip(0, 100)
     
-    # Productividad
     df_resumen_calc['productivity'] = df_resumen_calc['efficiency']
 
     # --- 7. Redondeo y Renombrado (para la compatibilidad con tu código) ---
@@ -526,14 +716,16 @@ def calcular_metricas_adicionales(df_resumen: pd.DataFrame, df_detalle: pd.DataF
     # Asegurar que todas las columnas finales existan, si no, crear con valor por defecto
     for col in columnas_finales:
         if col not in df_resumen_final.columns:
-            if col in ['Faltas', 'dias_laborables']: df_resumen_final[col] = 0
+            if col in ['Faltas', 'dias_laborables', 'Faltas Justificadas']: df_resumen_final[col] = 0
             elif col in ['Puntualidad (%)', 'Eficiencia (%)', 'SIC', 'Tasa Ausentismo (%)', 'Índice Puntualidad (%)', 'Eficiencia Horas (%)']: df_resumen_final[col] = 0.0
             else: df_resumen_final[col] = 'N/A'
 
     # Seleccionar y retornar las columnas necesarias para el front (Tablas y Gráficas)
     return df_resumen_final[list(set(df_resumen_final.columns).intersection(set(columnas_finales)))]
+# --- FIN CORRECCIÓN 5 ---
 
 
+# --- INICIA CORRECCIÓN 6 (Arreglo 73 empleados): agregar_datos_dashboard_por_sucursal ---
 def agregar_datos_dashboard_por_sucursal(df_metricas: pd.DataFrame) -> List[Dict]:
     """
     Agrupa el DataFrame con métricas por sucursal y calcula los KPIs para el dashboard.
@@ -556,7 +748,8 @@ def agregar_datos_dashboard_por_sucursal(df_metricas: pd.DataFrame) -> List[Dict
         return []
 
     df_sucursales = df_metricas.groupby(col_sucursal).agg(
-        employees=(col_id, 'count'),
+        # CAMBIO CLAVE: Contar empleados ÚNICOS, no filas.
+        employees=(col_id, 'nunique'),
         efficiency=(col_eficiencia, 'mean'),
         punctuality=(col_puntualidad, 'mean'),
         avgSIC=(col_sic, 'mean'),

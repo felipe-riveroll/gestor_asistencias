@@ -1,3 +1,5 @@
+# api_client.py (Completo y Corregido)
+
 """
 API client module for fetching data from external services.
 Handles communication with Frappe API for check-ins and leave applications.
@@ -48,7 +50,8 @@ class APIClient:
         }
         
         # Obtener todos los patrones para la sucursal
-        sucursal_key = device_filter.replace("%", "")
+        # (Nota: este 'device_filter' es la clave "Villas", "31pte", etc. que viene de main.py)
+        sucursal_key = device_filter 
         patterns = device_patterns.get(sucursal_key, [device_filter])
         
         all_records = []
@@ -165,6 +168,7 @@ class APIClient:
         
         return unique_records
 
+    # --- INICIA CORRECCIÓN: fetch_leave_applications ---
     def fetch_leave_applications(self, start_date: str, end_date: str) -> List[Dict[str, Any]]:
         """
         Fetches all approved leave applications from the API for a date range.
@@ -177,7 +181,12 @@ class APIClient:
             print(f"❌ Error validating API credentials: {e}")
             return []
         
-        url = f'https://erp.asiatech.com.mx/api/resource/Leave Application?fields=["employee","employee_name","leave_type","from_date","to_date","status","half_day"]&filters=[["status","=","Approved"],["from_date",">=","{start_date}"],["to_date","<=","{end_date}"]]'
+        # La lógica del filtro de fechas estaba incorrecta.
+        # La lógica NUEVA trae permisos que SE CRUZAN con el rango:
+        #   - La fecha de fin del permiso (to_date) debe ser >= a nuestro inicio (start_date)
+        #   - La fecha de inicio del permiso (from_date) debe ser <= a nuestro fin (end_date)
+        
+        url = f'https://erp.asiatech.com.mx/api/resource/Leave Application?fields=["employee","employee_name","leave_type","from_date","to_date","status","half_day"]&filters=[["status","=","Approved"],["to_date",">=","{start_date}"],["from_date","<=","{end_date}"]]'
 
         all_leave_records = []
         limit_start = 0
@@ -226,6 +235,8 @@ class APIClient:
 
         print(f"✅ Retrieved {len(all_leave_records)} approved leave applications.")
         return all_leave_records
+    # --- FIN CORRECCIÓN ---
+
 
     def fetch_employee_joining_dates(self) -> List[Dict[str, Any]]:
         """
