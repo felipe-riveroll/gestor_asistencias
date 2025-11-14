@@ -16,7 +16,6 @@ class Empleado(models.Model):
         return f"{self.nombre} {self.apellido_paterno}"
     class Meta:
         db_table = 'Empleados'
-        # Basado en la definición original :contentReference[oaicite:6]{index=6}
 
 class Sucursal(models.Model):
     sucursal_id = models.AutoField(primary_key=True, db_column='sucursal_id')
@@ -24,7 +23,11 @@ class Sucursal(models.Model):
 
     class Meta:
         db_table = 'Sucursales'
-        # Basado en :contentReference[oaicite:7]{index=7}
+
+    # --- FUSIÓN (de tu compañera, con indentación corregida) ---
+    def __str__(self):
+        return self.nombre_sucursal 
+    # --- FIN FUSIÓN ---
 
 class TipoTurno(models.Model):
     tipo_turno_id = models.AutoField(primary_key=True, db_column='tipo_turno_id')
@@ -32,7 +35,6 @@ class TipoTurno(models.Model):
 
     class Meta:
         db_table = 'TipoTurno'
-        # Basado en :contentReference[oaicite:8]{index=8}
 
 class Horario(models.Model):
     horario_id = models.AutoField(primary_key=True, db_column='horario_id')
@@ -43,7 +45,6 @@ class Horario(models.Model):
 
     class Meta:
         db_table = 'Horario'
-        # Basado en :contentReference[oaicite:9]{index=9}
 
 class DiaSemana(models.Model):
     dia_id = models.IntegerField(primary_key=True, db_column='dia_id')
@@ -51,7 +52,6 @@ class DiaSemana(models.Model):
 
     class Meta:
         db_table = 'DiaSemana'
-        # Basado en :contentReference[oaicite:10]{index=10}
 
 class AsignacionHorario(models.Model):
     asignacion_id = models.AutoField(primary_key=True, db_column='asignacion_id')
@@ -71,6 +71,7 @@ class AsignacionHorario(models.Model):
         unique_together = (
             ('empleado', 'sucursal', 'dia_especifico', 'es_primera_quincena'),
         )
+        # --- FUSIÓN (Esta es tu versión de indexes, que es la correcta) ---
         indexes = [
             models.Index(fields=['empleado', 'dia_especifico']),
             models.Index(fields=['empleado', 'sucursal']),
@@ -78,7 +79,7 @@ class AsignacionHorario(models.Model):
             models.Index(fields=['tipo_turno']),
             models.Index(fields=['dia_especifico']),
         ]
-        # Basado en :contentReference[oaicite:11]{index=11}
+
 class ResumenHorario(models.Model):
     empleado_id       = models.IntegerField(primary_key=True)
     nombre            = models.CharField(max_length=100)

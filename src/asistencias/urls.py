@@ -8,10 +8,13 @@ urlpatterns = [
     path('login/', views.login_view, name='login'),
     path("logout/", views.logout_view, name="logout"),
     path("admin-page/", views.admin_page, name="admin_page"),
+    path("admin-page/<int:empleado_id>/editar/", views.admin_page, name="editar_admin"),
+    path("admin-page/<int:empleado_id>/eliminar/", views.eliminar_admin, name="eliminar_admin"),
     path("manager-page/", views.manager_page, name="manager-page"),
     path("admin-gestion-empleados/", views.gestion_empleados, name="admin-gestion-empleados"),
     path("empleados/crear/", views.crear_empleado, name="guardar_empleado"),
     path("empleados/eliminar/<int:empleado_id>/", views.eliminar_empleado, name="eliminar-empleado"),
+    path('empleados/editar/<int:empleado_id>/', views.editar_empleado, name='editar-empleado'),
     path("empleados/crear-horario/", views.crear_horario, name="crear_horario"),
     path("gestion_usuarios/", views.gestion_usuarios, name="gestion_usuarios"),
     path("lista_asistencias/", views.lista_asistencias, name="lista_asistencias"),
@@ -29,4 +32,9 @@ urlpatterns = [
     path('api/dashboard/villas/', views.api_dashboard_villas, name='api-dashboard-villas'),
     path("grafica_nave/",views.grafica_nave,name='grafica_nave'),
     path('api/dashboard/nave/', views.api_dashboard_nave, name='api-dashboard-nave'),
+    # === ¡AGREGA ESTAS DOS LÍNEAS AQUÍ! ===
+    path('api/lista_sucursales/', views.api_lista_sucursales, name='api_lista_sucursales'),
+    path('api/lista_horarios/', views.api_lista_horarios, name='api_lista_horarios'),
+    # ========================================
+    path('api/empleado/<int:empleado_id>/horarios/', views.get_horarios_empleado, name='api_horarios_empleado'),
 ]

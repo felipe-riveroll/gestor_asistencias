@@ -1,4 +1,6 @@
 # Imports de Django
+from django.forms import ValidationError  # <-- Añadido de tu compañera
+from django.utils import timezone # <-- Añadido para export_dashboard_excel
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required
@@ -15,8 +17,8 @@ from openpyxl.styles import PatternFill, Border, Side, Alignment, Font
 from openpyxl.utils import get_column_letter
 
 # Imports de tus propios archivos de la aplicación
-from .services import autenticar_usuario, crear_empleado_service, crear_horario_service
-from .models import Sucursal, Horario, Empleado
+from .services import autenticar_usuario, crear_empleado_service, crear_horario_service, obtener_roles_service, editar_empleado_service
+from .models import Sucursal, Horario, Empleado, AsignacionHorario, DiaSemana
 from .main import generar_reporte_completo, generar_reporte_detalle_completo, generar_datos_dashboard_general,generar_datos_dashboard_31pte,generar_datos_dashboard_villas,generar_datos_dashboard_nave
  
 def inicio(request):
@@ -49,9 +51,48 @@ def login_view(request):
     
     return render(request, "login.html")
 
+# --- FUSIÓN: 'admin_page' de tu compañera (reemplaza la tuya) ---
 @login_required
-def admin_page(request):
-    return render(request, "admin_inicio.html")
+def admin_page(request, empleado_id=None):
+    # Importar servicios aquí es mala práctica, pero respetamos el código de tu compañera
+    from core.services import asignar_rol_service, obtener_admin_por_id_service
+    
+    if request.method == "POST":
+        resultado = asignar_rol_service(request.POST)
+        if "error" in resultado:
+            messages.error(request, resultado["error"])
+        else:
+            messages.success(request, resultado["success"])
+        return redirect("admin_page")  # Redirige a la misma página
+    
+    # Obtener lista de administradores y managers
+    administradores = obtener_roles_service()
+
+    # Si venimos desde /editar/, obtener el admin a editar
+    admin_editar = None
+    if empleado_id:
+        admin_editar = obtener_admin_por_id_service(empleado_id)
+
+    return render(
+        request, "admin_inicio.html",
+        {"administradores": administradores, "admin_editar": admin_editar},
+    )
+# --- FIN FUSIÓN ---
+
+# --- FUSIÓN: Nueva vista 'eliminar_admin' de tu compañera ---
+@login_required
+def eliminar_admin(request, empleado_id):
+    from core.services import eliminar_admin_service
+
+    resultado = eliminar_admin_service(empleado_id)
+
+    if "error" in resultado:
+        messages.error(request, resultado["error"])
+    else:
+        messages.success(request, resultado["success"])
+
+    return redirect("admin_page")
+# --- FIN FUSIÓN ---
 
 @login_required
 def manager_page(request):
@@ -69,24 +110,32 @@ def gestion_empleados(request):
         "horarios": horarios,
     })
 
+# --- FUSIÓN: 'crear_empleado' con tus prints y la lógica de tu compañera ---
 @login_required
 def crear_empleado(request):
     if request.method == "POST":
+        # Tus prints de depuración
         print("===== [DEBUG] request.POST =====")
         for key, value in request.POST.lists():
             print(f"{key}: {value}")
         print("================================")
 
         try:
-            crear_empleado_service(request.POST)
-            messages.success(request, "Empleado creado correctamente.")
-        except Exception as e:
+            # Lógica de tu compañera (recibe el empleado)
+            empleado = crear_empleado_service(request.POST)
+            # Mensaje de éxito de tu compañera
+            messages.success(request, f"Empleado {empleado.nombre} creado correctamente.")
+        except ValidationError as e: # <-- Manejo de errores de tu compañera
+            print("[ERROR en crear_empleado]:", str(e))
+            messages.error(request, str(e))
+        except Exception as e: # <-- Tu manejo de errores genérico (por si acaso)
             print("[ERROR en crear_empleado]:", str(e))
             messages.error(request, f"Error al crear empleado: {e}")
 
         return redirect('admin-gestion-empleados')
 
     return render(request, "gestion_empleados.html")
+# --- FIN FUSIÓN ---
 
 @login_required
 def eliminar_empleado(request, empleado_id):
@@ -94,13 +143,43 @@ def eliminar_empleado(request, empleado_id):
     empleado.delete()
     return redirect("admin-gestion-empleados")
 
+#-------------------------------------------
+@login_required
+def editar_empleado(request, empleado_id):
+    """
+    Recibe el POST del formulario de edición.
+    """
+    if request.method == "POST":
+        try:
+            # ¡Llamamos al nuevo servicio de edición!
+            empleado = editar_empleado_service(empleado_id, request.POST)
+            messages.success(request, f"Empleado {empleado.nombre} actualizado correctamente.")
+        except ValidationError as e:
+            print(f"[ERROR en vista editar_empleado]: {e}")
+            messages.error(request, str(e))
+        except Exception as e:
+            print(f"[ERROR en vista editar_empleado]: {e}")
+            messages.error(request, f"Error inesperado: {e}")
+        
+        # Al terminar, siempre redirige de vuelta a la lista
+        return redirect('admin-gestion-empleados')
+    
+    # Si alguien trata de ir por GET, simplemente lo mandamos a la lista
+    return redirect('admin-gestion-empleados')
+    #-----------------------------------------------------------
+    
+# --- FUSIÓN: 'crear_horario' de tu compañera (con try/except) ---
 @login_required
 def crear_horario(request):
     if request.method == "POST":
-        crear_horario_service(request.POST)
-        messages.success(request, "Horario creado correctamente")
-        return redirect("admin-gestion-empleados")
+        try:
+            crear_horario_service(request.POST)
+            messages.success(request, "Horario creado correctamente")
+        except ValidationError as e: # <-- Manejo de errores de tu compañera
+            messages.error(request, str(e))
+        return redirect("admin-gestion-empleados")  # redirige igual
     return render(request, "admin-gestion-empleados")
+# --- FIN FUSIÓN ---
 
 @login_required
 def gestion_usuarios(request):
@@ -153,9 +232,6 @@ def api_reporte_detalle(request):
         return JsonResponse(resultado)
     except Exception as e:
         return JsonResponse({"success": False, "error": f"Error interno del servidor: {str(e)}"}, status=500)
-
-# ❌ VISTA 'exportar_excel_con_colores' (que usaba POST) ELIMINADA 
-#    Se reemplaza por 'export_dashboard_excel' (que usa GET)
 
 # --- Gráficas y Dashboard ---
 @login_required
@@ -636,3 +712,125 @@ def api_dashboard_nave(request):
 
     except Exception as e:
         return JsonResponse({"success": False, "error": f"Error interno del servidor: {str(e)}"}, status=500)
+# =================================================================
+# === API PARA MODALES DE GESTIÓN DE EMPLEADOS ===
+# =================================================================
+
+@login_required
+@require_http_methods(["GET"])
+def api_lista_sucursales(request):
+    """
+    Envía una lista de todas las sucursales en formato JSON
+    para rellenar los <select> del modal de edición.
+    """
+    try:
+        # Tus modelos ya están importados al inicio del archivo
+        sucursales = Sucursal.objects.all()
+        
+        # Ajusta los nombres de los campos si son diferentes en tu models.py
+        data = [
+            {
+                "id": s.sucursal_id, 
+                "nombre": s.nombre_sucursal
+            } 
+            for s in sucursales
+        ]
+        return JsonResponse(data, safe=False)
+    except Exception as e:
+        return JsonResponse({"error": f"Error en API sucursales: {str(e)}"}, status=500)
+
+
+@login_required
+@require_http_methods(["GET"])
+def api_lista_horarios(request):
+    """
+    Envía una lista de todos los horarios en formato JSON
+    para rellenar los <select> del modal de edición.
+    """
+    try:
+        # Tus modelos ya están importados al inicio del archivo
+        horarios = Horario.objects.all()
+        
+        # Ajusta los nombres de los campos si son diferentes en tu models.py
+        data = [
+            {
+                "id": h.horario_id,
+                "texto": f"{h.hora_entrada.strftime('%H:%M')} - {h.hora_salida.strftime('%H:%M')}"
+            }
+            for h in horarios
+        ]
+        return JsonResponse(data, safe=False)
+    except Exception as e:
+        return JsonResponse({"error": f"Error en API horarios: {str(e)}"}, status=500)
+
+        # =================================================================
+# === API PARA HORARIOS DE UN EMPLEADO ESPECÍFICO ===
+# =================================================================
+@login_required
+@require_http_methods(["GET"])
+def get_horarios_empleado(request, empleado_id):
+    """
+    API para obtener los horarios específicos YA ASIGNADOS a un empleado.
+    Esta función agrupa las asignaciones (que están por día)
+    en los grupos que el JavaScript espera.
+    """
+    try:
+        # 1. Busca el empleado para asegurarse de que existe
+        empleado = get_object_or_404(Empleado, empleado_id=empleado_id)
+        
+        # 2. Busca TODAS las asignaciones de ese empleado
+        #    Usamos select_related para ser más eficientes (menos consultas a la BD)
+        asignaciones = AsignacionHorario.objects.filter(
+            empleado=empleado
+        ).select_related('sucursal', 'horario', 'dia_especifico')
+        
+        # 3. Agruparemos los horarios aquí.
+        #    La clave será (sucursal_id, horario_id)
+        grupos_de_horarios = {}
+
+        for a in asignaciones:
+            # Si una asignación no tiene sucursal, horario o día, la omitimos
+            if not a.sucursal or not a.horario or not a.dia_especifico:
+                continue
+
+            # Creamos una clave única para agrupar
+            key = (a.sucursal_id, a.horario_id)
+            
+            if key not in grupos_de_horarios:
+                # Si es la primera vez que vemos esta combinación, creamos el grupo
+                grupos_de_horarios[key] = {
+                    "sucursal_id": a.sucursal.sucursal_id,
+                    "sucursal_text": a.sucursal.nombre_sucursal,
+                    "horario_id": a.horario.horario_id,
+                    "horario_text": f"{a.horario.hora_entrada.strftime('%H:%M')} - {a.horario.hora_salida.strftime('%H:%M')}",
+                    "dias": [] # Lista temporal para guardar los objetos 'DiaSemana'
+                }
+            
+            # Agregamos el día al grupo correspondiente
+            grupos_de_horarios[key]["dias"].append(a.dia_especifico)
+
+        # 4. Convertimos los grupos al formato JSON final
+        lista_de_horarios_json = []
+        for grupo in grupos_de_horarios.values():
+            
+            # Ordenamos los días por su ID (1=Lunes, 2=Martes...)
+            dias_ordenados = sorted(grupo["dias"], key=lambda d: d.dia_id)
+            
+            # Creamos el JSON final que el JavaScript espera
+            lista_de_horarios_json.append({
+                "sucursal_id": grupo["sucursal_id"],
+                "sucursal_text": grupo["sucursal_text"],
+                "horario_id": grupo["horario_id"],
+                "horario_text": grupo["horario_text"],
+                "dias_ids": [d.dia_id for d in dias_ordenados],
+                "dias_nombres": ", ".join([d.nombre_dia for d in dias_ordenados])
+            })
+
+        return JsonResponse(lista_de_horarios_json, safe=False)
+
+    except Empleado.DoesNotExist:
+         return JsonResponse({"error": "Empleado no encontrado"}, status=404)
+    except Exception as e:
+        import traceback
+        traceback.print_exc() 
+        return JsonResponse({"error": f"Error interno del servidor: {str(e)}"}, status=500)

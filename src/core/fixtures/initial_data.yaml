@@ -115,7 +115,7 @@
   fields:
     descripcion: L-J
 - model: core.tipoturno
-  pk: 18
+  pk: 19
   fields:
     descripcion: V
 - model: core.tipoturno
@@ -344,6 +344,7 @@
     codigo_checador: 1643
     codigo_frappe: 1
     nombre: Beatriz
+    email: admon.ack@gmail.com
     tiene_horario_asignado: true
 - model: core.empleado
   pk: 2
@@ -353,6 +354,7 @@
     codigo_checador: 166
     codigo_frappe: 2
     nombre: Rocío Eufracia
+    email: rocio.rec456@gmail.com
     tiene_horario_asignado: true
 - model: core.empleado
   pk: 3
@@ -362,6 +364,7 @@
     codigo_checador: 1649
     codigo_frappe: 4
     nombre: Antonio
+    email: tonyrojas264@gmail.com
     tiene_horario_asignado: false
 - model: core.empleado
   pk: 4
@@ -371,6 +374,7 @@
     codigo_checador: 2310
     codigo_frappe: 5
     nombre: Marlene
+    email: fatima.sanchezauxiliar@gmail.com
     tiene_horario_asignado: true
 - model: core.empleado
   pk: 5
@@ -380,6 +384,7 @@
     codigo_checador: 2314
     codigo_frappe: 6
     nombre: Rebeca
+    email: rhasiatech1@gmail.com
     tiene_horario_asignado: true
 - model: core.empleado
   pk: 6
@@ -389,6 +394,7 @@
     codigo_checador: 2404
     codigo_frappe: 7
     nombre: Ana Paola
+    email: areajuridica199777@gmail.com
     tiene_horario_asignado: true
 - model: core.empleado
   pk: 7
@@ -398,6 +404,7 @@
     codigo_checador: 2401
     codigo_frappe: 8
     nombre: Quetzalli
+    email: Quetzalli.lopez03@outlook.com
     tiene_horario_asignado: true
 - model: core.empleado
   pk: 8
@@ -407,6 +414,7 @@
     codigo_checador: 2411
     codigo_frappe: 10
     nombre: Jose Juan Guillermo
+    email: avilag129@gmail.com
     tiene_horario_asignado: true
 - model: core.empleado
   pk: 9
@@ -416,6 +424,7 @@
     codigo_checador: 2423
     codigo_frappe: 12
     nombre: Esmeralda
+    email: esme.ehl.01@gmail.com
     tiene_horario_asignado: true
 - model: core.empleado
   pk: 10
@@ -425,6 +434,7 @@
     codigo_checador: 2422
     codigo_frappe: 13
     nombre: José Omar
+    email: omarvillalva19@gmail.com
     tiene_horario_asignado: true
 - model: core.empleado
   pk: 11
@@ -434,6 +444,7 @@
     codigo_checador: 2421
     codigo_frappe: 14
     nombre: Ivana
+    email: ivanareyes0@gmail.com
     tiene_horario_asignado: true
 - model: core.empleado
   pk: 12
@@ -443,6 +454,7 @@
     codigo_checador: 2413
     codigo_frappe: 16
     nombre: Odalys
+    email: odalyscastillo891@gmail.com
     tiene_horario_asignado: true
 - model: core.empleado
   pk: 13
@@ -452,6 +464,7 @@
     codigo_checador: 2501
     codigo_frappe: 17
     nombre: Rodrigo
+    email: rodrigo.cabrera10@hotmail.com
     tiene_horario_asignado: true
 - model: core.empleado
   pk: 14
@@ -461,6 +474,7 @@
     codigo_checador: 2503
     codigo_frappe: 18
     nombre: Angel Francisco
+    email: angel.irineos@alumno.buap.mx
     tiene_horario_asignado: true
 - model: core.empleado
   pk: 15
@@ -470,6 +484,7 @@
     codigo_checador: 2513
     codigo_frappe: 25
     nombre: Karla Ivette
+    email: chimalivette@gmail.com
     tiene_horario_asignado: true
 - model: core.empleado
   pk: 16
@@ -479,6 +494,7 @@
     codigo_checador: 2512
     codigo_frappe: 26
     nombre: Tanya Maribel
+    email: aynat696@gmail.com
     tiene_horario_asignado: true
 - model: core.empleado
   pk: 17
@@ -488,6 +504,7 @@
     codigo_checador: 2514
     codigo_frappe: 27
     nombre: Erick Tadeo
+    email: eerriicckkt@gmail.com
     tiene_horario_asignado: true
 - model: core.empleado
   pk: 18
@@ -497,6 +514,7 @@
     codigo_checador: 2511
     codigo_frappe: 28
     nombre: Daniela
+    email: danizaratec@gmail.com
     tiene_horario_asignado: true
 - model: core.empleado
   pk: 19
@@ -506,6 +524,7 @@
     codigo_checador: 3005
     codigo_frappe: 31
     nombre: Miguel
+    email: miguelsolisleonardo77@gmail.com
     tiene_horario_asignado: true
 - model: core.empleado
   pk: 20
@@ -515,6 +534,7 @@
     codigo_checador: 3006
     codigo_frappe: 32
     nombre: Raúl
+    email: pelontrompas@gmail.com
     tiene_horario_asignado: true
 - model: core.empleado
   pk: 21
@@ -524,6 +544,7 @@
     codigo_checador: 3007
     codigo_frappe: 33
     nombre: Mauricio
+    email: produccionack2019@gmail.com
     tiene_horario_asignado: true
 - model: core.empleado
   pk: 22
@@ -533,6 +554,7 @@
     codigo_checador: 3008
     codigo_frappe: 34
     nombre: Liliana
+    email: ack.ventas@gmail.com
     tiene_horario_asignado: true
 - model: core.empleado
   pk: 23
@@ -542,6 +564,7 @@
     codigo_checador: 3001
     codigo_frappe: 35
     nombre: Janeth Arleth
+    email: janetharleth19@gmail.com
     tiene_horario_asignado: true
 - model: core.empleado
   pk: 24
@@ -551,6 +574,7 @@
     codigo_checador: 3004
     codigo_frappe: 36
     nombre: Julio Cesar
+    email: jcesarmh0511@gmail.com
     tiene_horario_asignado: true
 - model: core.empleado
   pk: 25
@@ -560,6 +584,7 @@
     codigo_checador: 3003
     codigo_frappe: 37
     nombre: Román
+    email: roman.cvr3@gmail.com
     tiene_horario_asignado: true
 - model: core.empleado
   pk: 26
@@ -569,6 +594,7 @@
     codigo_checador: 3010
     codigo_frappe: 38
     nombre: Danae
+    email: dana4826.alvarez@gmail.com
     tiene_horario_asignado: true
 - model: core.empleado
   pk: 27
@@ -578,6 +604,7 @@
     codigo_checador: 3011
     codigo_frappe: 39
     nombre: Laura
+    email: laura.daza.aquino@gmail.com
     tiene_horario_asignado: true
 - model: core.empleado
   pk: 28
@@ -587,6 +614,7 @@
     codigo_checador: 3012
     codigo_frappe: 40
     nombre: Vanessa Araceli
+    email: araceli.maldonado6200@gmail.com
     tiene_horario_asignado: true
 - model: core.empleado
   pk: 29
@@ -596,6 +624,7 @@
     codigo_checador: 3016
     codigo_frappe: 41
     nombre: Jonathan Pajiel
+    email: perrito22w@gmail.com
     tiene_horario_asignado: true
 - model: core.empleado
   pk: 30
@@ -605,6 +634,7 @@
     codigo_checador: 3013
     codigo_frappe: 42
     nombre: Azul Rebeca
+    email: 4zul.hdez@gmail.com
     tiene_horario_asignado: true
 - model: core.empleado
   pk: 31
@@ -614,6 +644,7 @@
     codigo_checador: 3014
     codigo_frappe: 43
     nombre: Ricardo
+    email: ricardo.orea29@gmail.com
     tiene_horario_asignado: true
 - model: core.empleado
   pk: 32
@@ -623,6 +654,7 @@
     codigo_checador: 3009
     codigo_frappe: 45
     nombre: Vianey Citlali
+    email: citlali46@hotmail.com
     tiene_horario_asignado: true
 - model: core.empleado
   pk: 33
@@ -632,6 +664,7 @@
     codigo_checador: 1861
     codigo_frappe: 46
     nombre: Mónica Graciela
+    email: moniadmon2018@gmail.com
     tiene_horario_asignado: true
 - model: core.empleado
   pk: 34
@@ -641,15 +674,17 @@
     codigo_checador: 2116
     codigo_frappe: 47
     nombre: Maria Brenda
+    email: maria-brenda102@hotmail.com
     tiene_horario_asignado: true
 - model: core.empleado
   pk: 35
   fields:
-    apellido_materno: null
-    apellido_paterno: Ariziga
-    codigo_checador: 0001
+    apellido_materno: Ariziga
+    apellido_paterno: Alonso
+    codigo_checador: 1
     codigo_frappe: 48
-    nombre: Juan Alonso
+    nombre: Juan
+    email: null
     tiene_horario_asignado: false
 - model: core.empleado
   pk: 36
@@ -659,6 +694,7 @@
     codigo_checador: 4003
     codigo_frappe: 49
     nombre: Guadalupe
+    email: rojaslogua@gmail.com
     tiene_horario_asignado: true
 - model: core.empleado
   pk: 37
@@ -668,6 +704,7 @@
     codigo_checador: 4015
     codigo_frappe: 50
     nombre: Christian Joel
+    email: shadowoftheday28@gmail.com
     tiene_horario_asignado: true
 - model: core.empleado
   pk: 38
@@ -677,6 +714,7 @@
     codigo_checador: 4006
     codigo_frappe: 51
     nombre: María Fabiola
+    email: fabiolamonfilgarcia63@gmail.com
     tiene_horario_asignado: true
 - model: core.empleado
   pk: 39
@@ -686,6 +724,7 @@
     codigo_checador: 4012
     codigo_frappe: 52
     nombre: Ronel Alberico
+    email: proni635@gmail.com
     tiene_horario_asignado: true
 - model: core.empleado
   pk: 40
@@ -695,6 +734,7 @@
     codigo_checador: 4002
     codigo_frappe: 53
     nombre: David
+    email: contacto.gg.19@gmail.com
     tiene_horario_asignado: true
 - model: core.empleado
   pk: 41
@@ -704,6 +744,7 @@
     codigo_checador: 4011
     codigo_frappe: 54
     nombre: Claudia Itzel
+    email: contacto17n@gmail.com
     tiene_horario_asignado: true
 - model: core.empleado
   pk: 42
@@ -713,6 +754,7 @@
     codigo_checador: 4021
     codigo_frappe: 55
     nombre: Mauricio
+    email: maubuap@hotmail.com
     tiene_horario_asignado: true
 - model: core.empleado
   pk: 43
@@ -722,6 +764,7 @@
     codigo_checador: 4014
     codigo_frappe: 56
     nombre: Norlendy
+    email: norlendy2900@gmail.com
     tiene_horario_asignado: true
 - model: core.empleado
   pk: 44
@@ -731,6 +774,7 @@
     codigo_checador: 4008
     codigo_frappe: 57
     nombre: Marco Antonio
+    email: mendezcodmarcoantonio@gmail.com
     tiene_horario_asignado: true
 - model: core.empleado
   pk: 45
@@ -740,6 +784,7 @@
     codigo_checador: 4013
     codigo_frappe: 59
     nombre: Andrea Milay
+    email: andreaagam93@gmail.com
     tiene_horario_asignado: true
 - model: core.empleado
   pk: 46
@@ -749,6 +794,7 @@
     codigo_checador: 4004
     codigo_frappe: 60
     nombre: José Eduardo
+    email: gg.eduardo1817@gmail.com
     tiene_horario_asignado: true
 - model: core.empleado
   pk: 47
@@ -758,6 +804,7 @@
     codigo_checador: 4005
     codigo_frappe: 61
     nombre: Elvis Ernesto
+    email: pereelvisernesto58@gmail.com
     tiene_horario_asignado: true
 - model: core.empleado
   pk: 48
@@ -767,6 +814,7 @@
     codigo_checador: 4009
     codigo_frappe: 62
     nombre: Zuri Paola
+    email: alvaradomen.99@gmail.com
     tiene_horario_asignado: true
 - model: core.empleado
   pk: 49
@@ -776,6 +824,7 @@
     codigo_checador: 4010
     codigo_frappe: 63
     nombre: Ulises Gabriel
+    email: uvalenciacastillo@gmail.com
     tiene_horario_asignado: true
 - model: core.empleado
   pk: 50
@@ -785,6 +834,7 @@
     codigo_checador: 4019
     codigo_frappe: 64
     nombre: Fatima
+    email: fatimamerino244@gmail.com
     tiene_horario_asignado: true
 - model: core.empleado
   pk: 51
@@ -794,6 +844,7 @@
     codigo_checador: 4017
     codigo_frappe: 73
     nombre: Diana Joselyne
+    email: dr319346@gmail.com
     tiene_horario_asignado: true
 - model: core.empleado
   pk: 52
@@ -803,6 +854,7 @@
     codigo_checador: 4020
     codigo_frappe: 74
     nombre: Gerardo Uriel
+    email: uri_hl94@hotmail.com
     tiene_horario_asignado: true
 - model: core.empleado
   pk: 53
@@ -812,6 +864,7 @@
     codigo_checador: 3002
     codigo_frappe: 75
     nombre: Marisol
+    email: sol.26perdomo@gmail.com
     tiene_horario_asignado: true
 - model: core.empleado
   pk: 54
@@ -821,15 +874,17 @@
     codigo_checador: 2515
     codigo_frappe: 76
     nombre: Maximiliano
+    email: maxcuapa@gmail.com
     tiene_horario_asignado: true
 - model: core.empleado
   pk: 55
   fields:
     apellido_materno: Martínez
     apellido_paterno: Rivera
-    codigo_checador: 0002
+    codigo_checador: 2
     codigo_frappe: 65
     nombre: Marisol
+    email: Marisolriveramartinez918@gmail.com
     tiene_horario_asignado: true
 - model: core.empleado
   pk: 56
@@ -839,6 +894,7 @@
     codigo_checador: 5002
     codigo_frappe: 66
     nombre: José Carlos
+    email: cjosecarloscortesgarcia@gmail.com
     tiene_horario_asignado: true
 - model: core.empleado
   pk: 57
@@ -848,6 +904,7 @@
     codigo_checador: 5003
     codigo_frappe: 67
     nombre: Ian Natanael
+    email: ian_nata@hotmail.com
     tiene_horario_asignado: true
 - model: core.empleado
   pk: 58
@@ -857,6 +914,7 @@
     codigo_checador: 5001
     codigo_frappe: 68
     nombre: Miguel Ángel Nazario
+    email: mangarcia5051@gmail.com
     tiene_horario_asignado: true
 - model: core.empleado
   pk: 59
@@ -866,6 +924,7 @@
     codigo_checador: 2516
     codigo_frappe: 77
     nombre: Amelia
+    email: ameliac295@gmail.com
     tiene_horario_asignado: true
 - model: core.empleado
   pk: 60
@@ -875,6 +934,7 @@
     codigo_checador: 2517
     codigo_frappe: 78
     nombre: Lizbeth
+    email: lizzv.4400@gmail.com
     tiene_horario_asignado: true
 - model: core.empleado
   pk: 61
@@ -884,6 +944,7 @@
     codigo_checador: 2518
     codigo_frappe: 79
     nombre: Juan Jesus
+    email: jumeniz8714@gmail.com
     tiene_horario_asignado: true
 - model: core.empleado
   pk: 62
@@ -893,6 +954,7 @@
     codigo_checador: 2522
     codigo_frappe: 84
     nombre: Stephany
+    email: stephanymorales968@gmail.com
     tiene_horario_asignado: true
 - model: core.empleado
   pk: 63
@@ -902,6 +964,7 @@
     codigo_checador: 2523
     codigo_frappe: 85
     nombre: Brenda
+    email: brendaccoyotld9@gmail.com
     tiene_horario_asignado: true
 - model: core.empleado
   pk: 64
@@ -911,6 +974,7 @@
     codigo_checador: 2524
     codigo_frappe: 86
     nombre: Lorenzo
+    email: rojaslorenzogarcia@gmail.com
     tiene_horario_asignado: true
 - model: core.empleado
   pk: 65
@@ -920,6 +984,7 @@
     codigo_checador: 4022
     codigo_frappe: 87
     nombre: Elizabeth
+    email: lizzypg18@gmail.com
     tiene_horario_asignado: true
 - model: core.empleado
   pk: 66
@@ -929,6 +994,7 @@
     codigo_checador: 2520
     codigo_frappe: 82
     nombre: Antonio Alejandro
+    email: antonibarbosa07@gmail.com
     tiene_horario_asignado: true
 - model: core.empleado
   pk: 67
@@ -938,6 +1004,7 @@
     codigo_checador: 4016
     codigo_frappe: 88
     nombre: Carolina
+    email: cf037269@gmail.com
     tiene_horario_asignado: true
 - model: core.empleado
   pk: 68
@@ -947,6 +1014,7 @@
     codigo_checador: 4018
     codigo_frappe: 89
     nombre: Iván
+    email: rojasmarcosramirez@gmail.com
     tiene_horario_asignado: true
 - model: core.empleado
   pk: 69
@@ -956,6 +1024,7 @@
     codigo_checador: 3018
     codigo_frappe: 91
     nombre: Antonio
+    email: antonyhidalgo9@gmail.com
     tiene_horario_asignado: true
 - model: core.asignacionhorario
   pk: 1
@@ -2149,7 +2218,7 @@
     empleado: 64
     sucursal: 1
     tipo_turno: 1
-    horario: 26 
+    horario: 26
 - model: core.asignacionhorario
   pk: 151
   fields:
