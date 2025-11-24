@@ -1,17 +1,31 @@
 from django.contrib import admin
-from .models import Empleado  # Importa tu modelo Empleado
+# Asegúrate de importar TODOS tus modelos de core/models.py
+from .models import Empleado, Horario, AsignacionHorario, Sucursal, DiaSemana 
 
-# Opcional: Esto es para que la lista se vea bonita
+# === 1. Configuración del Empleado (Tu código) ===
+@admin.register(Empleado)
 class EmpleadoAdmin(admin.ModelAdmin):
-    # ¡Pon aquí los nombres de los campos que quieres ver en la lista!
-    # ¡CORREGIDO! Usamos los nombres de campos reales de tu models.py
-    list_display = ('nombre', 'apellido_paterno', 'apellido_materno', 'codigo_frappe') 
+    list_display = ('empleado_id', 'nombre', 'apellido_paterno', 'codigo_frappe', 'codigo_checador', 'email')
+    search_fields = ('nombre', 'apellido_paterno', 'codigo_frappe', 'email')
 
-    # ¡CORREGIDO! Usamos los campos reales para permitir la búsqueda
-    search_fields = ('nombre', 'apellido_paterno', 'apellido_materno', 'codigo_frappe')
+# === 2. REGISTRAR EL MODELO HORARIO (¡EL QUE FALTABA!) ===
+# Esto te permitirá ver y eliminar los horarios flexibles (sin descripción)
+@admin.register(Horario)
+class HorarioAdmin(admin.ModelAdmin):
+    list_display = ('horario_id', 'hora_entrada', 'hora_salida', 'cruza_medianoche', 'descripcion_horario')
+    list_filter = ('cruza_medianoche',)
+    search_fields = ('descripcion_horario', 'hora_entrada')
 
-# REGISTRA TU MODELO
-# Le decimos a Django que "muestre el modelo Empleado en el admin,
-# usando la configuración de la clase EmpleadoAdmin"
-admin.site.register(Empleado, EmpleadoAdmin)
-# Register your models here.
+# === 3. Registrar Asignaciones y Sucursales (Opcional, pero recomendado) ===
+@admin.register(AsignacionHorario)
+class AsignacionHorarioAdmin(admin.ModelAdmin):
+    list_display = ('empleado', 'sucursal', 'horario', 'dia_especifico')
+    list_filter = ('sucursal', 'horario', 'dia_especifico')
+
+@admin.register(Sucursal)
+class SucursalAdmin(admin.ModelAdmin):
+    list_display = ('sucursal_id', 'nombre_sucursal')
+
+@admin.register(DiaSemana)
+class DiaSemanaAdmin(admin.ModelAdmin):
+    list_display = ('dia_id', 'nombre_dia')

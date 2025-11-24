@@ -846,66 +846,70 @@ def agregar_datos_dashboard_por_sucursal(df_metricas: pd.DataFrame) -> List[Dict
 
     # --- PEGA EL NUEVO CÓDIGO AQUÍ ---
 
-def editar_empleado_service(empleado_id, data):
+def actualizar_datos_basicos_empleado_service(empleado_id, data):
     """
-    Actualiza un empleado existente y sus horarios.
+    Actualiza solo los campos básicos de Empleado (nombre, códigos, email).
     """
-    print(f"[DEBUG] Iniciando edición para Empleado ID: {empleado_id}")
-    print(f"[DEBUG] POST crudo (Editar): {dict(data)}")
+    from django.shortcuts import get_object_or_404 # Asegúrate de que este import esté al inicio del archivo
+    
+    # 1. Encontrar al empleado
+    empleado = get_object_or_404(Empleado, pk=empleado_id)
+    
+    # 2. Actualizar datos (usando los IDs del formulario 1)
+    # Nota: Los campos aquí deben coincidir con los "name" del formulario HTML
+    empleado.codigo_frappe = data.get("codigoFrappeEdit")
+    empleado.codigo_checador = data.get("codigoChecadorEdit")
+    empleado.nombre = data.get("nombreEdit")
+    empleado.apellido_paterno = data.get("primerApellidoEdit")
+    empleado.apellido_materno = data.get("segundoApellidoEdit")
+    empleado.email = data.get("emailEdit")
+    
+    # 3. Guardar y retornar
+    empleado.save()
+    return empleado
+
+# Abre core/services.py y añade esta función (o renombra la antigua)
+
+def actualizar_horarios_empleado_service(empleado_id, data):
+    """
+    Función de Formulario 2: Borra y re-crea horarios, sin tocar datos personales.
+    """
+    from django.shortcuts import get_object_or_404
+    from .models import Empleado, AsignacionHorario, Horario
+    from django.core.exceptions import ValidationError
 
     try:
-        # 1. Encontrar al empleado que vamos a editar
+        # 1. Encontrar al empleado
         empleado = get_object_or_404(Empleado, pk=empleado_id)
 
-        # 2. Actualizar sus datos básicos
-        # (Usamos los IDs del formulario de *Editar*, ej: 'nombreEdit')
-        empleado.codigo_frappe = data.get("codigoFrappeEdit")
-        empleado.codigo_checador = data.get("codigoChecadorEdit") # ¡Recuerda el límite de 32,767!
-        empleado.nombre = data.get("nombreEdit")
-        empleado.apellido_paterno = data.get("primerApellidoEdit")
-        empleado.apellido_materno = data.get("segundoApellidoEdit")
-        empleado.email = data.get("emailEdit")
-        empleado.save()
-
-        # 3. Borrar TODOS sus horarios antiguos
+        # 2. BORRAR TODOS sus horarios antiguos
         AsignacionHorario.objects.filter(empleado=empleado).delete()
-        print(f"[DEBUG] Horarios antiguos de {empleado.nombre} eliminados.")
-
-        # 4. Re-crear los horarios (lógica copiada de crear_empleado_service)
+        
+        # 3. Re-crear los horarios enviados (lógica de tu JS)
         sucursales = data.getlist("sucursales[]")
         horarios = data.getlist("horarios[]")
         dias = data.getlist("dias[]")
 
         if not sucursales:
-            print(f"[DEBUG] {empleado.nombre} se guardó sin horarios.")
+            # Si no hay nuevos horarios (botón Guardar Horarios presionado sin etiquetas)
+            return empleado 
 
+        # Si hay nuevos horarios, los creamos
         for sucursal_id, horario_id, dias_str in zip(sucursales, horarios, dias):
             dias_list = dias_str.split(",")
             for dia in dias_list:
-                try:
-                    horario_obj = Horario.objects.get(pk=int(horario_id))
-                    AsignacionHorario.objects.create(
-                        empleado=empleado,
-                        sucursal_id=int(sucursal_id),
-                        horario=horario_obj,
-                        dia_especifico_id=int(dia),
-                        hora_entrada_especifica=horario_obj.hora_entrada,
-                        hora_salida_especifica=horario_obj.hora_salida,
-                        hora_salida_especifica_cruza_medianoche=horario_obj.cruza_medianoche,
-                    )
-                except Horario.DoesNotExist:
-                    print(f"[ERROR] Horario ID {horario_id} no existe, saltando.")
-                except Exception as e:
-                    print(f"[ERROR] No se pudo crear asignación: {e}")
-        
-        print(f"[DEBUG] Horarios nuevos para {empleado.nombre} creados.")
+                horario_obj = Horario.objects.get(pk=int(horario_id))
+                AsignacionHorario.objects.create(
+                    empleado=empleado,
+                    sucursal_id=int(sucursal_id),
+                    horario=horario_obj,
+                    dia_especifico_id=int(dia),
+                    hora_entrada_especifica=horario_obj.hora_entrada,
+                    hora_salida_especifica=horario_obj.hora_salida,
+                    hora_salida_especifica_cruza_medianoche=horario_obj.cruza_medianoche,
+                )
         return empleado
 
-    except ValidationError as e:
-        print(f"[ERROR en editar_empleado_service]: {e}")
-        raise e # Re-lanzar la excepción para que la vista la atrape
     except Exception as e:
-        print(f"[ERROR en editar_empleado_service]: {e}")
-        raise ValidationError(f"Error inesperado al editar: {e}")
-
-# --- FIN DEL NUEVO CÓDIGO ---
+        # Aquí puedes manejar errores específicos si Horario.DoesNotExist, pero re-lanzaremos el error.
+        raise ValidationError(f"Error al guardar horarios: {e}")

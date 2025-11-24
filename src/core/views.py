@@ -8,6 +8,10 @@ from django.views.decorators.http import require_http_methods
 from django.contrib import messages
 from django.http import JsonResponse, HttpResponse
 
+#Import pdf y excel de admin
+from django.conf import settings
+from django.template.loader import render_to_string
+from django.views.decorators.csrf import csrf_exempt
 # Imports de librerías externas
 import json
 from io import BytesIO
@@ -17,7 +21,7 @@ from openpyxl.styles import PatternFill, Border, Side, Alignment, Font
 from openpyxl.utils import get_column_letter
 
 # Imports de tus propios archivos de la aplicación
-from .services import autenticar_usuario, crear_empleado_service, crear_horario_service, obtener_roles_service, editar_empleado_service
+from .services import autenticar_usuario, crear_empleado_service, crear_horario_service, obtener_roles_service, actualizar_horarios_empleado_service
 from .models import Sucursal, Horario, Empleado, AsignacionHorario, DiaSemana
 from .main import generar_reporte_completo, generar_reporte_detalle_completo, generar_datos_dashboard_general,generar_datos_dashboard_31pte,generar_datos_dashboard_villas,generar_datos_dashboard_nave
  
@@ -110,27 +114,182 @@ def gestion_empleados(request):
         "horarios": horarios,
     })
 
+#Exportacion de excel de Admin
+@login_required
+def exportar_lista_empleados_excel(request):
+    try:
+        # 🟢 1. OBTENER TÉRMINO DE BÚSQUEDA Y FILTRAR
+        search_term = request.GET.get('q', '').strip()
+        
+        # 2. Iniciar la consulta
+        empleados = Empleado.objects.all()
+
+        # 3. Aplicar el filtro si se proporcionó un término de búsqueda
+        if search_term:
+            from django.db.models import Q # Importación requerida para Q objects
+            
+            # Filtra por nombre, apellidos, correo o códigos (icontains=insensible a mayúsculas/minúsculas)
+            empleados = empleados.filter(
+                Q(nombre__icontains=search_term) |
+                Q(apellido_paterno__icontains=search_term) |
+                Q(apellido_materno__icontains=search_term) |
+                Q(email__icontains=search_term) |
+                Q(codigo_frappe__icontains=search_term) |
+                Q(codigo_checador__icontains=search_term)
+            )
+
+        # 4. Crear el libro...
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Lista de Empleados"
+
+        # 5. Definir encabezados (11 columnas: se añadió 'Días Asignados')
+        headers = [
+            'ID', 'Código Frappe', 'Código Checador', 'Nombre', 'Apellidos', 'Email', 'Sucursal', 'Horario de Entrada', 'Horario de Salida', 'Días Asignados', 'Activo'
+        ]
+        ws.append(headers)
+
+        # 6. Estilos
+        header_fill = PatternFill(start_color="8DB4E3", end_color="8DB4E3", fill_type="solid")
+        header_font = Font(color="FFFFFF", bold=True)
+        
+        # Borde visible (estilo medium para asegurar que se vea)
+        visible_border = Border(left=Side(style='medium'), right=Side(style='medium'), top=Side(style='medium'), bottom=Side(style='medium'))
+        
+        for cell in ws[1]:
+            cell.border = visible_border
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = Alignment(horizontal='center', vertical='center')
+
+        # 7. Llenar la hoja de cálculo con los datos
+        for empleado in empleados: 
+            
+            # --- Inicialización de Variables ---
+            nombre_sucursal = 'Sin Asignar'
+            horario_entrada = 'N/A'
+            horario_salida = 'N/A'
+            dias_asignados_str = 'Sin días' # 👈 Inicializamos la variable de días
+            is_active_status = 'No (Sin User)'
+
+            # 🟢 Lógica de Extracción de Datos (Sucursal, Horarios y Días) 🟢
+            try:
+                # Buscamos TODAS las asignaciones (select_related para optimizar)
+                asignaciones = empleado.asignaciones.select_related('sucursal', 'horario', 'dia_especifico')
+                
+                if asignaciones.exists():
+                    
+                    # Usamos la primera asignación para Sucursal y Horario (asumiendo consistencia)
+                    primera_asignacion = asignaciones.first()
+                    
+                    if primera_asignacion.sucursal:
+                        nombre_sucursal = primera_asignacion.sucursal.nombre_sucursal
+                    
+                    # Extracción de Horarios
+                    if primera_asignacion.horario and primera_asignacion.horario.hora_entrada:
+                        horario_entrada = primera_asignacion.horario.hora_entrada.strftime('%H:%M') 
+                    
+                    if primera_asignacion.horario and primera_asignacion.horario.hora_salida:
+                        horario_salida = primera_asignacion.horario.hora_salida.strftime('%H:%M')
+                    
+                    # 🟢 EXTRACCIÓN Y ORDENAMIENTO DE DÍAS 🟢
+                    dias = [
+                        a.dia_especifico.nombre_dia 
+                        for a in asignaciones 
+                        if a.dia_especifico
+                    ]
+                    
+                    # Definimos el orden de los días para listarlos correctamente
+                    orden_dias = {'Lunes':1, 'Martes':2, 'Miércoles':3, 'Jueves':4, 'Viernes':5, 'Sábado':6, 'Domingo':7}
+                    dias_ordenados = sorted(dias, key=lambda d: orden_dias.get(d, 8))
+
+                    # Creamos la cadena de texto final
+                    dias_asignados_str = ", ".join(dias_ordenados)
+                        
+            except Exception:
+                pass # Si algo falla en la BD o la asignación es nula
+
+            # Lógica de usuario activo
+            if empleado.user:
+                is_active_status = 'Sí' if empleado.user.is_active else 'No'
+
+            # La lista de datos con 11 elementos
+            fila_datos = [
+                empleado.empleado_id, 
+                empleado.codigo_frappe,
+                empleado.codigo_checador,
+                empleado.nombre,
+                empleado.apellido_paterno + ' ' + (empleado.apellido_materno or ''), 
+                empleado.email,
+                nombre_sucursal,
+                horario_entrada,
+                horario_salida, 
+                dias_asignados_str,
+                is_active_status,
+            ]
+            
+            ws.append(fila_datos)
+            
+            # Aplicamos el borde a la fila de datos
+            for cell in ws[ws.max_row]:
+                cell.border = visible_border
+                cell.alignment = Alignment(horizontal='center', vertical='center')
+
+        # 8. Autoajuste de Columnas
+        for col in ws.columns:
+            max_length = 0
+            column_letter = col[0].column_letter
+            for cell in col:
+                try:
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+                except:
+                    pass
+            adjusted_width = min((max_length + 2), 50) 
+            ws.column_dimensions[column_letter].width = adjusted_width
+
+        # 9. Guardar y Enviar...
+        buffer = BytesIO()
+        wb.save(buffer)
+        buffer.seek(0)
+        
+        response = HttpResponse(
+            buffer.getvalue(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = 'attachment; filename="lista_empleados_asiatech.xlsx"'
+        return response
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        messages.error(request, f"Error al generar el Excel: {e}")
+        return redirect('admin-gestion-empleados')
+
 # --- FUSIÓN: 'crear_empleado' con tus prints y la lógica de tu compañera ---
 @login_required
+@require_http_methods(["GET", "POST"])
 def crear_empleado(request):
+
     if request.method == "POST":
-        # Tus prints de depuración
+
+        # Debug opcional
         print("===== [DEBUG] request.POST =====")
         for key, value in request.POST.lists():
             print(f"{key}: {value}")
         print("================================")
 
         try:
-            # Lógica de tu compañera (recibe el empleado)
             empleado = crear_empleado_service(request.POST)
-            # Mensaje de éxito de tu compañera
             messages.success(request, f"Empleado {empleado.nombre} creado correctamente.")
-        except ValidationError as e: # <-- Manejo de errores de tu compañera
-            print("[ERROR en crear_empleado]:", str(e))
+
+        except ValidationError as e:
+            print("[ERROR en crear_empleado]:", e)
             messages.error(request, str(e))
-        except Exception as e: # <-- Tu manejo de errores genérico (por si acaso)
-            print("[ERROR en crear_empleado]:", str(e))
-            messages.error(request, f"Error al crear empleado: {e}")
+
+        except Exception as e:
+            print("[ERROR inesperado en crear_empleado]:", e)
+            messages.error(request, "Ocurrió un error inesperado al crear el empleado.")
 
         return redirect('admin-gestion-empleados')
 
@@ -145,40 +304,72 @@ def eliminar_empleado(request, empleado_id):
 
 #-------------------------------------------
 @login_required
+@require_http_methods(["POST"])
 def editar_empleado(request, empleado_id):
     """
-    Recibe el POST del formulario de edición.
+    Vista encargada EXCLUSIVAMENTE de actualizar los horarios de un empleado.
+    La edición de datos básicos se realiza en otra vista separada.
     """
-    if request.method == "POST":
-        try:
-            # ¡Llamamos al nuevo servicio de edición!
-            empleado = editar_empleado_service(empleado_id, request.POST)
-            messages.success(request, f"Empleado {empleado.nombre} actualizado correctamente.")
-        except ValidationError as e:
-            print(f"[ERROR en vista editar_empleado]: {e}")
-            messages.error(request, str(e))
-        except Exception as e:
-            print(f"[ERROR en vista editar_empleado]: {e}")
-            messages.error(request, f"Error inesperado: {e}")
-        
-        # Al terminar, siempre redirige de vuelta a la lista
-        return redirect('admin-gestion-empleados')
-    
-    # Si alguien trata de ir por GET, simplemente lo mandamos a la lista
+    try:
+        empleado = actualizar_horarios_empleado_service(empleado_id, request.POST)
+        messages.success(request, f"Horarios de {empleado.nombre} actualizados correctamente.")
+
+    except ValidationError as e:
+        # Error esperado (datos incorrectos, horarios inválidos, etc.)
+        messages.error(request, str(e))
+
+    except Exception as e:
+        # Error inesperado del sistema
+        messages.error(request, "Ocurrió un error inesperado al actualizar los horarios.")
+        print(f"[ERROR inesperado en editar_empleado]: {e}")
+
+    # Redirige siempre de vuelta al panel de empleados
     return redirect('admin-gestion-empleados')
     #-----------------------------------------------------------
+@login_required
+@require_http_methods(["POST"])
+def editar_datos_basicos_empleado(request, empleado_id):
+    """
+    VISTA PARA EL FORMULARIO 1: Procesa el Formulario de Datos Personales (Email, Códigos) 
+    sin afectar las asignaciones de horarios del empleado.
+    """
+    # Nota: Asegúrate de que esta función 'actualizar_datos_basicos_empleado_service' 
+    # esté definida en tu archivo services.py
+    from .services import actualizar_datos_basicos_empleado_service
     
+    try:
+        empleado = actualizar_datos_basicos_empleado_service(empleado_id, request.POST, )
+        messages.success(request, f"Datos de {empleado.nombre} actualizados correctamente.")
+        
+    except ValidationError as e:
+        messages.error(request, str(e))
+    except Exception as e:
+        messages.error(request, f"Error al actualizar datos: {e}")
+        
+    return redirect('admin-gestion-empleados')
+#--------------------------------------------------------
 # --- FUSIÓN: 'crear_horario' de tu compañera (con try/except) ---
 @login_required
+@require_http_methods(["POST"])
 def crear_horario(request):
     if request.method == "POST":
         try:
+            from .services import crear_horario_service # Asegurar que esté importado
+
             crear_horario_service(request.POST)
-            messages.success(request, "Horario creado correctamente")
-        except ValidationError as e: # <-- Manejo de errores de tu compañera
-            messages.error(request, str(e))
-        return redirect("admin-gestion-empleados")  # redirige igual
-    return render(request, "admin-gestion-empleados")
+            
+            # 🟢 CAMBIO CLAVE: DEVOLVER JSON DE ÉXITO en lugar de redirigir
+            return JsonResponse({"success": "Horario creado correctamente"}, status=200) 
+            
+        except ValidationError as e: 
+            # Devolver JSON con error (para que el JS lo maneje)
+            return JsonResponse({"error": str(e)}, status=400)
+            
+        except Exception as e: 
+            return JsonResponse({"error": f"Error interno: {str(e)}"}, status=500)
+            
+    # Si alguien intenta hacer GET, que redirija a la lista
+    return redirect("admin-gestion-empleados")
 # --- FIN FUSIÓN ---
 
 @login_required
@@ -236,7 +427,12 @@ def api_reporte_detalle(request):
 # --- Gráficas y Dashboard ---
 @login_required
 def grafica_general(request):
-    return render(request, "grafica_general.html")
+    is_admin = request.user.groups.filter(name="Admin").exists()
+
+    context = {
+        'is_admin': is_admin,  # Variable booleana para el template
+    }
+    return render(request, "grafica_general.html", context) # ⬅️ SE PASA EL CONTEXTO
 
 @login_required
 @require_http_methods(["GET"])
@@ -650,7 +846,12 @@ def export_dashboard_excel(request):
 #31pte
 @login_required
 def grafica_31pte(request):
-    return render(request, "grafica_31pte.html")
+    is_admin = request.user.groups.filter(name="Admin").exists()
+
+    context = {
+        'is_admin': is_admin,  # Variable booleana para el template
+    }
+    return render(request, "grafica_31pte.html", context) # ⬅️ SE PASA EL CONTEXTO
 
 @login_required
 @require_http_methods(["GET"])
@@ -672,7 +873,12 @@ def api_dashboard_31pte(request):
 #Villas
 @login_required
 def grafica_villas(request):
-    return render(request, "grafica_villas.html")
+    is_admin = request.user.groups.filter(name="Admin").exists()
+
+    context = {
+        'is_admin': is_admin,  # Variable booleana para el template
+    }
+    return render(request, "grafica_villas.html", context) # ⬅️ SE PASA EL CONTEXTO
 
 @login_required
 @require_http_methods(["GET"])
@@ -694,7 +900,12 @@ def api_dashboard_villas(request):
 #Nave
 @login_required
 def grafica_nave(request):
-    return render(request, "grafica_nave.html")
+    is_admin = request.user.groups.filter(name="Admin").exists()
+
+    context = {
+        'is_admin': is_admin,  # Variable booleana para el template
+    }
+    return render(request, "grafica_nave.html", context) # ⬅️ SE PASA EL CONTEXTO
 
 @login_required
 @require_http_methods(["GET"])
@@ -749,13 +960,17 @@ def api_lista_horarios(request):
     """
     try:
         # Tus modelos ya están importados al inicio del archivo
-        horarios = Horario.objects.all()
+        horarios = Horario.objects.all().order_by('hora_entrada')
         
         # Ajusta los nombres de los campos si son diferentes en tu models.py
         data = [
             {
                 "id": h.horario_id,
                 "texto": f"{h.hora_entrada.strftime('%H:%M')} - {h.hora_salida.strftime('%H:%M')}"
+                # 🟢 AÑADIR CONDICIONAL PARA DESCRIPCIÓN 🟢
+                + (f" ({h.descripcion_horario})" if h.descripcion_horario else ""),
+                # 🟢 CLAVE: Marcar si es un horario flexible/personalizado (ej. si tiene descripción)
+                "es_flexible": True if h.descripcion_horario and not h.descripcion_horario.replace(':', '').isdigit() else False
             }
             for h in horarios
         ]
@@ -834,3 +1049,71 @@ def get_horarios_empleado(request, empleado_id):
         import traceback
         traceback.print_exc() 
         return JsonResponse({"error": f"Error interno del servidor: {str(e)}"}, status=500)
+
+@login_required
+@require_http_methods(["DELETE"])
+def api_eliminar_horario_flexible(request, horario_id):
+    """
+    Elimina un horario específico de la tabla Horario.
+    Debe usarse SOLO para horarios flexibles/personalizados.
+    """
+    try:
+        horario = Horario.objects.get(pk=horario_id)
+        
+        # Opcional: Se podría añadir una validación aquí para asegurar 
+        # que NO sea un horario estándar (si tu modelo Horario tiene un campo is_flexible=True)
+        # o que no esté asignado a ningún empleado.
+
+        horario.delete()
+        return JsonResponse({"success": "Horario eliminado correctamente y lista limpia."}, status=200)
+    
+    except Horario.DoesNotExist:
+        return JsonResponse({"error": "Horario no encontrado."}, status=404)
+    except Exception as e:
+        return JsonResponse({"error": f"Error al eliminar: {str(e)}"}, status=500)
+
+
+# === VISTA EXPORTAR A EXCEL ===
+@login_required
+@require_http_methods(["POST"])
+@csrf_exempt # Puedes necesitar esto si el token CSRF falla en la petición fetch
+def exportar_excel(request):
+    """
+    Recibe los datos de la tabla de empleados desde el frontend y genera un archivo Excel.
+    """
+    try:
+        # Usamos json.loads para obtener el payload enviado por JavaScript
+        data = json.loads(request.body)
+        headers = data['headers']
+        rows = data['rows']
+        filename = data['filename']
+        
+        # 1. Crear el libro de trabajo de Excel
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Empleados"
+        
+        # 2. Escribir encabezados
+        ws.append(headers)
+        
+        # 3. Escribir filas
+        for row in rows:
+            ws.append(row)
+            
+        # 4. Guardar en memoria (BytesIO)
+        buffer = BytesIO()
+        wb.save(buffer)
+        buffer.seek(0)
+        
+        # 5. Configurar la respuesta HTTP para la descarga
+        response = HttpResponse(
+            buffer.getvalue(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        # Aseguramos el nombre del archivo, compatible con caracteres especiales
+        response['Content-Disposition'] = f'attachment; filename="{escape_uri_path(filename)}.xlsx"'
+        return response
+
+    except Exception as e:
+        # En caso de error, devolvemos un JSON para que el frontend lo muestre
+        return JsonResponse({'error': f'Error interno al generar Excel: {str(e)}'}, status=500)

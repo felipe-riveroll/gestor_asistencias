@@ -14,6 +14,10 @@ urlpatterns = [
     path("admin-gestion-empleados/", views.gestion_empleados, name="admin-gestion-empleados"),
     path("empleados/crear/", views.crear_empleado, name="guardar_empleado"),
     path("empleados/eliminar/<int:empleado_id>/", views.eliminar_empleado, name="eliminar-empleado"),
+    # ----------------------------------------------------
+    # 🟢 CAMBIO CRÍTICO 1: URL para Formulario 1 (Datos Personales/Email)
+    # ----------------------------------------------------
+    path('empleados/editar-datos-basicos/<int:empleado_id>/', views.editar_datos_basicos_empleado, name='editar_datos_basicos'),
     path('empleados/editar/<int:empleado_id>/', views.editar_empleado, name='editar-empleado'),
     path("empleados/crear-horario/", views.crear_horario, name="crear_horario"),
     path("gestion_usuarios/", views.gestion_usuarios, name="gestion_usuarios"),
@@ -37,4 +41,9 @@ urlpatterns = [
     path('api/lista_horarios/', views.api_lista_horarios, name='api_lista_horarios'),
     # ========================================
     path('api/empleado/<int:empleado_id>/horarios/', views.get_horarios_empleado, name='api_horarios_empleado'),
+    # En urls.py, dentro de urlpatterns
+    path('api/horarios/eliminar/<int:horario_id>/', views.api_eliminar_horario_flexible, name='api_eliminar_horario'),
+    # 🟢 RUTA AÑADIDA PARA EXPORTAR EL EXCEL DE LA LISTA DE EMPLEADOS 🟢
+    path("admin-gestion-empleados/exportar/excel/", views.exportar_lista_empleados_excel, name="exportar_lista_empleados_excel"),
+    # ----------------------------------------------------
 ]

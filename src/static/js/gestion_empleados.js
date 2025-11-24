@@ -1,33 +1,51 @@
 document.addEventListener("DOMContentLoaded", () => {
-  // --- Elementos del DOM: Modal AGREGAR ---
-  const modal = document.getElementById("employeeModal");
-  const form = document.getElementById("employeeForm");
-  const btnAdd = document.getElementById("btnAdd"); // Botón flotante '+'
-  const btnCancel = document.querySelector("#employeeModal .btn-cancel"); // Cancelar de modal AGREGAR
-  const sucursalSelect = document.getElementById("sucursal");
-  const horarioSelect = document.getElementById("horario");
-  const btnAgregar = document.getElementById("agregarHorario");
-  const horariosAgregados = document.getElementById("horariosAgregados");
+    // --- Elementos del DOM: Modal AGREGAR (Formulario principal) ---
+    const modal = document.getElementById("employeeModal");
+    const form = document.getElementById("employeeForm");
+    const btnAdd = document.getElementById("btnAdd");
+    const btnCancel = document.querySelector("#employeeModal .btn-cancel");
+    const sucursalSelect = document.getElementById("sucursal");
+    const horarioSelect = document.getElementById("horario");
+    const btnAgregar = document.getElementById("agregarHorario");
+    const horariosAgregados = document.getElementById("horariosAgregados");
+    
+    // --- Elementos del DOM: Modal EDITAR (Principal) ---
+    const editModal = document.getElementById("editEmployeeModal");
+    
+    // ** ELEMENTOS DEL FORMULARIO 1 (Datos Personales) **
+    const employeeDataForm = document.getElementById("employeeDataForm");
+    const employeeIdData = document.getElementById("employeeIdData");
+    const horariosFlexiblesAdmin = document.getElementById("horariosFlexiblesAdmin");
 
-  // --- Elementos del DOM: Modal EDITAR ---
-  const editModal = document.getElementById("editEmployeeModal");
-  const editForm = document.getElementById("editEmployeeForm");
-  const sucursalSelectEdit = document.getElementById("sucursalEdit");
-  const horarioSelectEdit = document.getElementById("horarioEdit");
-  const btnAgregarEdit = document.getElementById("agregarHorarioEdit");
-  const horariosAgregadosEdit = document.getElementById("horariosAgregadosEdit");
+    // ** ELEMENTOS DEL FORMULARIO 2 (Horarios Específicos) **
+    // Estos eran los que faltaban y causaban el ReferenceError:
+    const sucursalSelectEdit = document.getElementById("sucursalEdit");
+    const horarioSelectEdit = document.getElementById("horarioEdit");
+    const btnAgregarEdit = document.getElementById("agregarHorarioEdit"); // <-- Faltaba
+    const horariosAgregadosEdit = document.getElementById("horariosAgregadosEdit");
+    // ⬇️ NUEVA DECLARACIÓN ⬇️
+    const btnAddScheduleFromEdit = document.getElementById("btnAddScheduleFromEdit");
 
-  // --- Elementos del DOM: Comunes ---
-  const closeButtons = document.querySelectorAll(".close");
-  const searchInput = document.getElementById("searchInput");
-  const tableBody = document.getElementById("employeeTableBody");
+    // ** ELEMENTOS DE ENVÍO DE HORARIOS (Botones y Form) **
+    const scheduleDataForm = document.getElementById("scheduleDataForm");
+    const employeeIdSchedule = document.getElementById("employeeIdSchedule");
+    const btnGuardarHorarios = document.getElementById("btnGuardarHorarios");
+    const btnCancelarHorarios = document.getElementById("btnCancelarHorarios");
 
-  // --- Elementos del DOM: Modal de Horarios (el pequeño) ---
-  const scheduleModal = document.getElementById("scheduleModal");
-  const btnAddSchedule = document.getElementById("btnAddSchedule");
-  const scheduleForm = document.getElementById("scheduleForm");
-  const cancelAddSchedule = document.getElementById("cancelAddSchedule");
+    // --- Elementos del DOM: Comunes ---
+    const closeButtons = document.querySelectorAll(".close");
+    const searchInput = document.getElementById("searchInput");
+    const tableBody = document.getElementById("employeeTableBody");
 
+    // --- Elementos del DOM: Modal de Horarios (el pequeño para crear horarios nuevos) ---
+    const scheduleModal = document.getElementById("scheduleModal");
+    const btnAddSchedule = document.getElementById("btnAddSchedule");
+    const scheduleForm = document.getElementById("scheduleForm");
+    const cancelAddSchedule = document.getElementById("cancelAddSchedule");
+
+    // --- Elementos del DOM: Botones de Exportación ---
+    const btnExportExcel = document.getElementById("btnExportExcel");
+    const btnExportPDF = document.getElementById("btnExportPDF");
   // =================================================================
   // LÓGICA DE BÚSQUEDA EN TABLA
   // =================================================================
@@ -69,40 +87,56 @@ document.addEventListener("DOMContentLoaded", () => {
     const editButton = e.target.closest(".btn-editar");
 
     // Si se hizo clic en un botón de editar
-    if (editButton) {
-      e.preventDefault(); // Previene que el link <a> navegue
-      
-      const data = editButton.dataset; // Lee todos los 'data-' atributos
+if (editButton) {
+    e.preventDefault(); 
+    
+    const data = editButton.dataset; 
+    const empId = data.id; 
+    
+    // ----------------------------------------------------------
+    // 1. RELLENAR CAMPOS DE DATOS PERSONALES (Formulario 1)
+    // ----------------------------------------------------------
+    
+    // ⚠️ ID para Visualización (Asumo que es para el campo 'ID de Empleado' de solo lectura)
+    // Si esta es la línea que falla, significa que el ID es incorrecto en tu HTML.
+    document.getElementById('employeeIndexDisplay').value = empId; 
+    
+    // Rellenar Códigos y Nombres
+    document.getElementById('codigoFrappeEdit').value = data.frappe;
+    document.getElementById('codigoChecadorEdit').value = data.checador;
+    document.getElementById('nombreEdit').value = data.nombre;
+    document.getElementById('primerApellidoEdit').value = data.paterno;
+    document.getElementById('segundoApellidoEdit').value = data.materno;
+    document.getElementById('emailEdit').value = data.email;
+    
+    // ----------------------------------------------------------------
+    // 2. CONEXIÓN DE LOS DOS FORMULARIOS SEPARADOS
+    // ----------------------------------------------------------------
+    
+    // A. Formulario 1 (Datos Personales)
+    document.getElementById('employeeIdData').value = empId; // Input oculto para envío
+    employeeDataForm.action = `/empleados/editar-datos-basicos/${empId}/`;
+    
+    // B. Formulario 2 (Horarios)
+    employeeIdSchedule.value = empId; // Input oculto para envío
+    scheduleDataForm.action = `/empleados/editar/${empId}/`;
+    
+    // ----------------------------------------------------------------
+    
+    // Limpia horarios previos 
+    horariosAgregadosEdit.innerHTML = `<div class="empty-schedule">Cargando horarios...</div>`;
 
-      // 1. Rellena el formulario de EDICIÓN con los datos de la tabla
-      document.getElementById('employeeIdEdit').value = data.id;
-      document.getElementById('employeeIndexDisplay').value = data.id; 
-      document.getElementById('codigoFrappeEdit').value = data.frappe;
-      document.getElementById('codigoChecadorEdit').value = data.checador;
-      document.getElementById('nombreEdit').value = data.nombre;
-      document.getElementById('primerApellidoEdit').value = data.paterno;
-      document.getElementById('segundoApellidoEdit').value = data.materno;
-      document.getElementById('emailEdit').value = data.email;
-      // --- ¡AÑADE ESTA LÍNEA! ---
-      // Esto le pone la URL correcta al formulario (ej: /empleados/editar/80/)
-      editForm.action = `/empleados/editar/${data.id}/`;
-      // Limpia horarios previos
-      horariosAgregadosEdit.innerHTML = `<div class="empty-schedule">Cargando horarios...</div>`;
+    // 3. Llama a las APIs para rellenar los <select>
+    cargarSucursales(sucursalSelectEdit); 
+    cargarHorarios(horarioSelectEdit);  
+    cargarHorariosAsignados(empId); 
 
-      // 2. Llama a las APIs para rellenar los <select> del modal de EDICIÓN
-      cargarSucursales(sucursalSelectEdit); // Pasa el <select> de EDICIÓN
-      cargarHorarios(horarioSelectEdit);   // Pasa el <select> de EDICIÓN
-      
-      // ----------------------------------------------------------------
-      // ¡¡AQUÍ ESTÁ EL CAMBIO #1!!
-      // Se activa la llamada a la nueva función para cargar horarios guardados
-      // ----------------------------------------------------------------
-      cargarHorariosAsignados(data.id); 
+    // 4. Muestra el modal de EDICIÓN
+    const editModal = document.getElementById("editEmployeeModal");
+    editModal.style.display = "flex";
+}
+});
 
-      // 4. Muestra el modal de EDICIÓN
-      editModal.style.display = "flex";
-    }
-  });
 
 
   // =================================================================
@@ -210,20 +244,86 @@ document.addEventListener("DOMContentLoaded", () => {
       return false;
     }
   });
+// =================================================================
+// LÓGICA DE ENVÍO Y SERIALIZACIÓN PARA GUARDAR ASIGNACIONES (Formulario 2)
+// ESTA FUNCIÓN RESUELVE TU PROBLEMA
+// =================================================================
 
-  // --- Validar formulario de EDITAR ---
-  if (editForm) {
-    editForm.addEventListener("submit", function (e) {
-      const horarios = horariosAgregadosEdit.querySelectorAll(".schedule-label");
-      if (horarios.length === 0) {
-        e.preventDefault(); // Evita que el formulario se envíe
-        alert("⚠️ Debe asignar al menos un horario antes de guardar.");
-        return false;
-      }
-    });
-  }
+// Las variables scheduleDataForm, horariosAgregadosEdit, sucursalSelectEdit y horarioSelectEdit ya están definidas al inicio del script.
+if (scheduleDataForm) {
+    scheduleDataForm.addEventListener("submit", async function (e) {
+        e.preventDefault(); 
+        
+        const form = this; 
+        const horariosRestantes = horariosAgregadosEdit.querySelectorAll('.schedule-label');
+        
+        // --- 1. VALIDACIÓN (Lógica Correcta) ---
+        if (horariosRestantes.length === 0) {
+            if (sucursalSelectEdit.value || horarioSelectEdit.value) {
+                alert("⚠️ Por favor, agregue el horario a la lista con el botón '+' o asegúrese de que los selectores estén vacíos antes de guardar.");
+                return; 
+            }
+        }
+        
+        // --- 2. SERIALIZACIÓN: RECOLECCIÓN DE TAGS Y DATOS OCULTOS ---
+        
+        // Creamos un nuevo FormData para evitar conflictos con el formulario original
+        const finalFormData = new FormData();
+        
+        // 1. Añadir el token CSRF (debe obtenerse del formulario)
+        const csrfToken = document.querySelector('#scheduleDataForm input[name="csrfmiddlewaretoken"]').value;
+        finalFormData.append('csrfmiddlewaretoken', csrfToken); 
+        
+        // 2. Añadir el ID del empleado
+        finalFormData.append('empleado_id', employeeIdSchedule.value); 
+        
+        // 🟢 CÓDIGO A INSERTAR: SERIALIZACIÓN DE CAMPOS SUPERIORES (SELECTS Y CHECKBOXES)
 
+        // Serializar Sucursal y Horario (se envían aunque estén vacíos)
+        finalFormData.append('sucursalEdit', document.getElementById('sucursalEdit').value);
+        finalFormData.append('horarioEdit', document.getElementById('horarioEdit').value);
 
+        // Serializar los checkboxes de días seleccionados (si hay alguno para agregar)
+        document.querySelectorAll('#scheduleDataForm .day-selector .day-checkbox:checked').forEach(checkbox => {
+            // Django espera arrays para los días, por eso usamos el mismo nombre que el tag.
+            finalFormData.append('dias[]', checkbox.dataset.id); 
+        });
+
+        // 3. Recopilamos los datos de los inputs ocultos dentro de los tags negros restantes
+        horariosRestantes.forEach(etiqueta => {
+            etiqueta.querySelectorAll('input[type="hidden"]').forEach(input => {
+                // Esto añade sucursales[], horarios[], y dias[] al FormData
+                finalFormData.append(input.name, input.value);
+            });
+        });
+        
+        // --- 3. ENVÍO ASÍNCRONO FINAL ---
+        try {
+            const response = await fetch(form.action, {
+                method: 'POST',
+                body: finalFormData,
+            });
+
+            if (response.ok) {
+                // Éxito al guardar: Cerramos modal y recargamos la página.
+                const editModal = document.getElementById("editEmployeeModal");
+                editModal.style.display = 'none';
+                
+                alert('✅ Asignaciones de horario guardadas y actualizadas.');
+                window.location.reload(); 
+                
+            } else {
+                // Si la respuesta no es OK (ej. error 400), alertamos al usuario.
+                const errorText = await response.text();
+                alert('❌ Error al guardar asignaciones. El servidor rechazó los datos.');
+                console.error("Error del servidor:", errorText);
+            }
+        } catch (error) {
+            console.error('Error de red al guardar asignaciones:', error);
+            alert('❌ Error de conexión al servidor.');
+        }
+    });
+}
   // =================================================================
   // LÓGICA PARA CERRAR MODALES
   // =================================================================
@@ -242,6 +342,25 @@ document.addEventListener("DOMContentLoaded", () => {
       btnCancelEdit.addEventListener("click", () => (editModal.style.display = "none"));
   }
 
+// ⬇️ AÑADE TU NUEVO CÓDIGO AQUÍ ⬇️
+// Nuevo manejador para el botón Cancelar del Formulario 1 (Datos Personales)
+const btnCancelData = document.querySelector("#editEmployeeModal .btn-cancel-data");
+if (btnCancelData) {
+    btnCancelData.addEventListener("click", () => {
+        const editModal = document.getElementById("editEmployeeModal");
+        editModal.style.display = "none";
+    });
+}
+// ⬆️ FIN DEL CÓDIGO AÑADIDO ⬆️
+
+// ⬇️ MANEJADOR PARA EL BOTÓN CANCELAR DEL FORMULARIO 2 (Horarios) ⬇️
+if (btnCancelarHorarios) {
+    btnCancelarHorarios.addEventListener("click", () => {
+        const editModal = document.getElementById("editEmployeeModal");
+        editModal.style.display = "none";
+    });
+}
+// ⬆️ FIN DEL CÓDIGO AÑADIDO ⬆️
 
   window.addEventListener("click", (e) => {
     if (e.target.classList.contains("modal")) {
@@ -304,28 +423,90 @@ document.addEventListener("DOMContentLoaded", () => {
   /**
    * Pide la lista de horarios a la API y las pone en el <select> que le pases.
    */
-  async function cargarHorarios(selectElement) {
-    if (!selectElement) return;
+// Añadir esta función en gestion_empleados.js, cerca de las funciones cargar...
+function actualizarListaHorariosFlexibles(horarios) {
+    const listContainer = document.getElementById('horariosFlexiblesAdmin');
+    if (!listContainer) return;
 
-    try {
-      const response = await fetch('/api/lista_horarios/'); // ¡URL de tu API!
-      if (!response.ok) throw new Error('Error al cargar horarios');
-      
-      const horarios = await response.json();
+    listContainer.innerHTML = ''; 
+    let flexibleCount = 0;
 
-      selectElement.innerHTML = '<option value="" disabled selected>Seleccione...</option>';
+    horarios.forEach(horario => {
+        // Solo mostramos el botón de eliminación para horarios flexibles
+        if (horario.es_flexible) {
+            flexibleCount++;
+            const itemDiv = document.createElement('div');
+            itemDiv.classList.add('horario-flexible-item'); 
+            itemDiv.innerHTML = `
+                <span>${horario.texto}</span>
+                <button type="button" class="btn-eliminar-horario" data-id="${horario.id}">
+                    <i class="fas fa-times"></i>
+                </button>
+            `;
+            
+            // 🟢 MANEJADOR DE CLIC:
+            itemDiv.querySelector('.btn-eliminar-horario').addEventListener('click', async function(e) {
+                e.preventDefault();
+                // ⚠️ Se agregó esta línea para evitar la propagación si hay selects cerca
+                e.stopPropagation(); 
+                
+                if (confirm(`¿Estás seguro de eliminar el horario: ${horario.texto}?`)) {
+                    const selectElement = document.getElementById('horarioEdit');
 
-      horarios.forEach(horario => {
-        const option = document.createElement('option');
-        option.value = horario.id;
-        option.textContent = horario.texto; // ej: "Tiempo Completo (9-6)"
-        selectElement.appendChild(option);
-      });
+                    const success = await eliminarHorario(this.dataset.id);
+                    if (success) {
+                        // Recargar la lista DESPUÉS de eliminar
+                        await cargarHorarios(selectElement); 
+                    }
+                }
+            });
+            
+            listContainer.appendChild(itemDiv);
+        }
+    });
 
-    } catch (error) {
-      console.error('Error en cargarHorarios:', error);
-    }
-  }
+    if (flexibleCount === 0) {
+        listContainer.innerHTML = '<p class="text-muted" style="text-align: center;">No hay horarios flexibles para administrar.</p>';
+    }
+}
+// REEMPLAZAR la función cargarHorarios existente con esta versión
+async function cargarHorarios(selectElement) {
+    if (!selectElement) return null;
+
+    try {
+        const response = await fetch('/api/lista_horarios/');
+        if (!response.ok) throw new Error('Error al cargar horarios');
+        
+        const horarios = await response.json();
+
+        // 1. Limpiar y rellenar el SELECT
+        selectElement.innerHTML = '<option value="" disabled selected>Seleccione...</option>';
+        let lastHorarioId = null;
+
+        horarios.forEach(horario => {
+            // Llenar el SELECT principal
+            const option = document.createElement('option');
+            option.value = horario.id;
+            option.textContent = horario.texto; 
+            
+            // ⚠️ Importante: Mantenemos el flag de flexibilidad para la futura lista de borrado
+            option.dataset.flexible = horario.es_flexible; 
+
+            selectElement.appendChild(option);
+            lastHorarioId = horario.id; 
+        });
+
+        // 2. Llenar la lista de administración de horarios flexibles
+        // 🟢 NUEVA LLAMADA: Llamamos a una nueva función que se encargará de crear la lista de botones "X".
+        actualizarListaHorariosFlexibles(horarios); 
+
+        return lastHorarioId;
+
+    } catch (error) {
+        console.error('Error en cargarHorarios:', error);
+        return null;
+    }
+}
 
  // ----------------------------------------------------------------
  // ¡¡AQUÍ ESTÁ EL CAMBIO #2!!
@@ -389,4 +570,149 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+// =================================================================
+// 3. ABRIR MODAL PEQUEÑO DESDE EL MODAL GRANDE DE EDICIÓN
+// =================================================================
+if (btnAddScheduleFromEdit) {
+    btnAddScheduleFromEdit.addEventListener("click", function (e) {
+        e.preventDefault();
+        
+        // 1. Mostrar el modal pequeño (Agregar Horario)
+        scheduleModal.style.display = "flex";
+        
+        // 2. Limpiar y establecer valores por defecto
+        scheduleForm.reset();
+        document.querySelector('input[name="cruzaNoche"][value="no"]').checked = true; // Por defecto a "No"
+        document.getElementById("horaEntrada").focus();
+    });
+}
+// ⬇️ LÓGICA DE ENVÍO ASÍNCRONO DEL MODAL PEQUEÑO (FINAL) ⬇️
+if (scheduleForm) {
+    scheduleForm.addEventListener("submit", async function (e) {
+        e.preventDefault();
+        
+        const formData = new FormData(scheduleForm);
+        
+        try {
+            const response = await fetch(scheduleForm.action, {
+                method: 'POST',
+                body: formData
+            });
+
+            if (response.ok) {
+                const scheduleModal = document.getElementById('scheduleModal');
+                const horarioSelectEdit = document.getElementById('horarioEdit');
+
+                // 1. CERRAR EL MODAL PEQUEÑO
+                scheduleModal.style.display = 'none';
+                
+                // 2. RECARGAR EL SELECT Y OBTENER EL ID DEL ÚLTIMO ELEMENTO
+                // ⚠️ CAMBIO CRÍTICO: Aquí almacenamos el ID devuelto por la función
+                const newHorarioId = await cargarHorarios(horarioSelectEdit); 
+                
+                // 3. SELECCIONAR EL HORARIO RECIÉN CREADO EN EL DROPDOWN
+                if (newHorarioId) {
+                    horarioSelectEdit.value = newHorarioId; // ⬅️ SELECCIONA el nuevo valor.
+                }
+                
+                alert('✅ Horario creado y lista actualizada.');
+                
+            } else {
+                // Manejar errores
+                const errorData = await response.json();
+                alert(`⚠️ Error al crear horario: ${errorData.error || 'Verifique los datos.'}`);
+            }
+        } catch (error) {
+            console.error('Error al enviar horario:', error);
+            alert('❌ Error de conexión o servidor.');
+        }
+    });
+}
 });
+
+// 🟢 FUNCIÓN DE ELIMINACIÓN DE API (Añadir al final de gestion_empleados.js)
+async function eliminarHorario(horarioId) {
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    
+    try {
+        const response = await fetch(`/api/horarios/eliminar/${horarioId}/`, {
+            method: 'DELETE',
+            headers: {
+                'X-CSRFToken': csrfToken 
+            }
+        });
+
+        if (response.ok) {
+            alert('Horario eliminado exitosamente.');
+            return true;
+        } else {
+            const error = await response.json();
+            alert(`Fallo la eliminación: ${error.error}`);
+            return false;
+        }
+    } catch (error) {
+        console.error('Error de red al eliminar:', error);
+        alert('Error de conexión al servidor.');
+        return false;
+    }
+}
+// =================================================================
+// LÓGICA DE EXPORTACIÓN A EXCEL (DESCARGA DE LISTA DE EMPLEADOS)
+// =================================================================
+
+if (btnExportExcel) {
+    btnExportExcel.addEventListener("click", function (e) {
+        e.preventDefault(); 
+        
+        // 🟢 1. OBTENER EL VALOR DE BÚSQUEDA
+        // Asumiendo que 'searchInput' es el elemento <input> del buscador.
+        const searchInput = document.getElementById("searchInput"); 
+        const searchValue = searchInput ? searchInput.value.trim() : '';
+
+        // 2. Definir la URL base
+        let urlDeDescarga = "/admin-gestion-empleados/exportar/excel/"; 
+        
+        // 🟢 3. AÑADIR EL PARÁMETRO DE BÚSQUEDA a la URL si existe un valor
+        if (searchValue) {
+            // Usamos encodeURIComponent para manejar espacios y caracteres especiales
+            urlDeDescarga += `?q=${encodeURIComponent(searchValue)}`;
+        }
+        
+        // --- MÉTODO INFALIBLE: FORZAR REDIRECCIÓN CON LA RUTA COMPLETA ---
+        const baseUrl = window.location.origin;
+        window.location.href = baseUrl + urlDeDescarga; // Envía la URL con o sin ?q=...
+        
+        // Opcional: Feedback visual durante la descarga
+        this.disabled = true;
+        this.textContent = "Descargando Excel...";
+        
+        setTimeout(() => {
+            this.disabled = false;
+            this.innerHTML = '<i class="fas fa-file-excel"></i> Exportar Excel';
+        }, 5000); 
+    });
+}
+
+// =================================================================
+// LÓGICA DE EXPORTACIÓN A PDF (DESCARGA DE LISTA DE EMPLEADOS)
+// =================================================================
+
+if (btnExportPDF) {
+    btnExportPDF.addEventListener("click", function (e) {
+        e.preventDefault(); 
+        
+        // Usamos la URL que definimos en urls.py
+        const urlDeDescarga = "/admin-gestion-empleados/exportar/pdf/"; 
+        
+        window.location.href = urlDeDescarga;
+        
+        // Opcional: Feedback visual durante la descarga
+        this.disabled = true;
+        this.textContent = "Generando PDF...";
+        
+        setTimeout(() => {
+            this.disabled = false;
+            this.innerHTML = '<i class="fas fa-file-pdf"></i> Exportar PDF';
+        }, 5000); 
+    });
+}

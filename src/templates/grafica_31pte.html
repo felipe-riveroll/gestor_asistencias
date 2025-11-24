@@ -14,17 +14,23 @@
   <div class="main-wrapper"> 
         <header class="top-navbar">
             <div class="logo">
-                <h1>Recursos Humanos</h1>
+                {% if is_admin %}
+                    <h1>Panel de Administración</h1>
+                {% else %}
+                    <h1>Recursos Humanos</h1>
+                {% endif %}
             </div>
             <div class="user-menu">
-              <a href="{% url 'logout' %}" id="logoutBtn" class="user-btn" title="Cerrar sesión" aria-label="Cerrar sesión">
+            <a href="{% url 'logout' %}" id="logoutBtn" class="user-btn" title="Cerrar sesión" aria-label="Cerrar sesión">
                     <i class="fas fa-sign-out-alt"></i>
-              </a>
+            </a>
             </div>
         </header>
 
         <aside class="sidebar">
             <nav class="main-menu">
+                
+                {% if not is_admin %}
                 <div class="menu-section">
                     <h3 class="section-title">REPORTES</h3>
                     <ul>
@@ -42,12 +48,32 @@
                         </li>
                     </ul>
                 </div>
-            </nav>
-            <div class="menu-section">
+                {% endif %}
+                
+                {% if is_admin %}
+                <div class="menu-section admin-menu-section">
+                    <h3 class="section-title">GESTIÓN</h3>
+                    <ul>
+                        <li class="menu-item">
+                            <a href="{% url 'admin-gestion-empleados' %}">
+                                <i class="fas fa-users-cog"></i>
+                                <span>Gestión de empleados</span>
+                            </a>
+                        </li>
+                        <li class="menu-item">
+                            <a href="{% url 'admin_page' %}">
+                                <i class="fas fa-users"></i>
+                                <span>Gestión de Administradores</span>
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+                {% endif %}
+
+                <div class="menu-section">
                     <h3 class="section-title">PANEL DE GRÁFICAS</h3>
                     <ul class="main-menu">
-                        <li class="menu-item">
-                            <a href="{% url 'grafica_general' %}">
+                        <li class="menu-item"> <a href="{% url 'grafica_general' %}">
                                 <i class="fas fa-globe"></i>
                                 <span>General</span>
                             </a>
@@ -70,7 +96,6 @@
                                 <span>Nave</span>
                             </a>
                         </li>
-                       
                     </ul>
                 </div>
             </nav>
