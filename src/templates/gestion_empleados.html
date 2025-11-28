@@ -18,8 +18,8 @@
     <link rel="stylesheet" href="{% static 'css/menu.css' %}" />
   </head>
   <body>
-    <div class="container">
-      <!-- NAVBAR -->
+    <div class="container-root"> 
+      
       <header class="top-navbar">
         <div class="logo">
           <h1>Panel de Administración</h1>
@@ -30,7 +30,7 @@
           </a>
         </div>
       </header>
-      <!-- Menú lateral -->
+      
       <aside class="sidebar">
         <nav class="main-menu">
           <div class="menu-section">
@@ -82,543 +82,548 @@
         </nav>
       </aside>
 
-      <!-- CONTENEDOR PRINCIPAL -->
-      <div class="main-container">
-        <div class="header">
-          <div class="logo">
-            <i class="fas fa-laptop-code"></i>
-            <span>Asiatech</span>
+      <div class="content-wrapper">
+        <div class="main-container">
+          
+          <div class="header">
+            <div class="logo">
+              <i class="fas fa-laptop-code"></i>
+              <span>Asiatech</span>
+            </div>
+            <h1>Gestion de Empleados</h1>
+            <div class="header-actions">
+              <button id="btnExportExcel" class="btn btn-success">
+                <i class="fas fa-file-excel"></i> Exportar Excel
+              </button>
+              <button id="btnExportPDF" class="btn btn-danger">
+                <i class="fas fa-file-pdf"></i> Exportar PDF
+              </button>
+            </div>
           </div>
-          <h1>Gestion de Empleados</h1>
-          <div class="header-actions">
-            <button id="btnExportExcel" class="btn btn-success">
-              <i class="fas fa-file-excel"></i> Exportar Excel
-            </button>
-            <button id="btnExportPDF" class="btn btn-danger">
-              <i class="fas fa-file-pdf"></i> Exportar PDF
-            </button>
-          </div>
-        </div>
 {% if messages %}
-        <div id="messages-container">
-          {% for message in messages %}
-          <div class="alerta {{ message.tags }}">
-            <i class="fas 
-                {% if 'success' in message.tags %}fa-check-circle{% 
-                elif 'error' in message.tags %}fa-times-circle{% 
-                elif 'warning' in message.tags %}fa-exclamation-triangle{% 
-                else %}fa-info-circle{% endif %}"></i>
-            <p>{{ message }}</p>
+          <div id="messages-container">
+            {% for message in messages %}
+            <div class="alerta {{ message.tags }}">
+              <i class="fas 
+                  {% if 'success' in message.tags %}fa-check-circle{% 
+                  elif 'error' in message.tags %}fa-times-circle{% 
+                  elif 'warning' in message.tags %}fa-exclamation-triangle{% 
+                  else %}fa-info-circle{% endif %}"></i>
+              <p>{{ message }}</p>
+            </div>
+            {% endfor %}
           </div>
-          {% endfor %}
-        </div>
-        {% endif %}
+{% endif %}
 
-        <div class="search-container">
+          <div class="search-container">
 
-          <input
-            type="text"
-            id="searchInput"
-            placeholder="Buscar empleado..."
-          />
-          <i class="fas fa-search"></i>
-        </div>
+            <input
+              type="text"
+              id="searchInput"
+              placeholder="Buscar empleado..."
+            />
+            <i class="fas fa-search"></i>
+          </div>
 
-        <div class="table-container">
-          <table class="styled-report-table">
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Código Frappe</th>
-                <th>Código Checador</th>
-                <th>Nombre</th>
-                <th>Apellidos</th>
-                <th>Email</th>
-                <th>Acciones</th>
-              </tr>
-            </thead>
-            <tbody id="employeeTableBody">
-              {% if empleados %} {% for emp in empleados %}
-              <tr>
-                <td>{{ emp.empleado_id }}</td>
-                <td>{{ emp.codigo_frappe }}</td>
-                <td>{{ emp.codigo_checador }}</td>
-                <td>{{ emp.nombre }}</td>
-                <td>{{ emp.apellido_paterno }} {{ emp.apellido_materno }}</td>
-                <td>{{ emp.email }}</td>
-                <td class="actions">
-                  <!-- Botón editar -->
-                  <a href="#" class="btn btn-success btn-editar"
-                  data-id="{{ emp.empleado_id }}"
-                  data-frappe="{{ emp.codigo_frappe }}"
-                  data-checador="{{ emp.codigo_checador }}"
-                  data-nombre="{{ emp.nombre }}"
-                  data-paterno="{{ emp.apellido_paterno }}"
-                  data-materno="{{ emp.apellido_materno }}"
-                  data-email="{{ emp.email }}"
-                >
-                    <i class="fas fa-edit"></i>
-                </a>
+          <div class="table-container">
+            <table class="styled-report-table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Código Frappe</th>
+                  <th>Código Checador</th>
+                  <th>Nombre</th>
+                  <th>Apellidos</th>
+                  <th>Email</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="employeeTableBody">
+                {% if empleados %} {% for emp in empleados %}
+                <tr class="{% if emp.is_deleted %}deleted-row{% endif %}">
+                  <td>{{ emp.empleado_id }}</td>
+                  <td>{{ emp.codigo_frappe }}</td>
+                  <td>{{ emp.codigo_checador }}</td>
+                  <td>{{ emp.nombre }}</td>
+                  <td>{{ emp.apellido_paterno }} {{ emp.apellido_materno }}</td>
+                  <td>{{ emp.email }}</td>
+                  <td class="actions">
+                    
+                    {% if not emp.is_deleted %}
+                    <a href="#" class="btn btn-success btn-editar"
+                    data-id="{{ emp.empleado_id }}"
+                    data-frappe="{{ emp.codigo_frappe }}"
+                    data-checador="{{ emp.codigo_checador }}"
+                    data-nombre="{{ emp.nombre }}"
+                    data-paterno="{{ emp.apellido_paterno }}"
+                    data-materno="{{ emp.apellido_materno }}"
+                    data-email="{{ emp.email }}"
+                    >
+                      <i class="fas fa-edit"></i>
+                    </a>
 
-                  <!-- Botón eliminar -->
-                  <a
-                    href="{% url 'eliminar-empleado' emp.empleado_id %}"
-                    class="btn btn-danger"
-                    onclick="return confirm('¿Estás seguro de que deseas eliminar este empleado?');"
+                    <a
+                      href="{% url 'eliminar-empleado' emp.empleado_id %}"
+                      class="btn btn-danger"
+                      onclick="return confirm('¿Estás seguro de que deseas eliminar este empleado?');"
+                    >
+                      <i class="fas fa-trash"></i>
+                    </a>
+                    {% else %}
+                    <a
+                      href="{% url 'restaurar-empleado' emp.empleado_id %}"
+                      class="btn btn-warning"
+                      onclick="return confirm('¿Estás seguro de que deseas restaurar este empleado?');"
+                      title="Restaurar Empleado"
+                    >
+                      <i class="fas fa-undo"></i>
+                    </a>
+                    {% endif %}
+                  </td>
+                </tr>
+                {% endfor %} {% else %}
+                <tr>
+                  <td colspan="9" style="text-align: center">No hay datos</td>
+                </tr>
+                {% endif %}
+              </tbody>
+            </table>
+          </div>
+          
+
+          <button id="btnAdd" class="floating-btn">
+            <i class="fas fa-plus"></i>
+          </button>
+          <button id="btnImport" class="btn-import">
+            <i class="fas fa-file-import"></i>
+          </button>
+
+          <div id="employeeModal" class="modal">
+            <div class="modal-content">
+              <span class="close">&times;</span>
+              <h2 id="modalTitle">Editor Empleado</h2>
+
+              <h3 class="section-title">Datos del Empleado</h3>
+
+              <form
+                id="employeeForm"
+                method="POST"
+                action="{% url 'guardar_empleado' %}"
+              >
+                {% csrf_token %}
+                <input type="hidden" id="employeeId" />
+                <div class="form-grid">
+                  <div class="form-group">
+                    <label for="codigoFrappe">Código Frappe*</label>
+                    <input
+                      type="text"
+                      id="codigoFrappe"
+                      name="codigoFrappe"
+                      pattern="^[0-9]+$"
+                      title="Solo números"
+                      required
+                    />
+                  </div>
+                  <div class="form-group">
+                    <label for="codigoChecador">Código Checador*</label>
+                    <input
+                      type="text"
+                      id="codigoChecador"
+                      name="codigoChecador"
+                      pattern="^[0-9]+$"
+                      title="Solo números"
+                      required
+                    />
+                  </div>
+                  <div class="form-group">
+                    <label for="nombre">Nombre*</label>
+                    <input
+                      type="text"
+                      id="nombre"
+                      name="nombre"
+                      pattern="^[A-Za-zÁÉÍÓÚáéíóúÑñ ]+$"
+                      title="Solo letras"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div class="form-grid">
+                  <div class="form-group">
+                    <label for="primerApellido">Primer Apellido*</label>
+                    <input
+                      type="text"
+                      id="primerApellido"
+                      name="primerApellido"
+                      pattern="^[A-Za-zÁÉÍÓÚáéíóúÑñ ]+$"
+                      title="Solo letras"
+                      required
+                    />
+                  </div>
+                  <div class="form-group">
+                    <label for="segundoApellido">Segundo Apellido</label>
+                    <input
+                      type="text"
+                      id="segundoApellido"
+                      name="segundoApellido"
+                      pattern="^[A-Za-zÁÉÍÓÚáéíóúÑñ ]+$"
+                      title="Solo letras"
+                      required
+                    />
+                  </div>
+                  <div class="form-group">
+                    <label for="email">Email*</label>
+                    <input type="email" id="email" name="email" required />
+                  </div>
+                </div>
+
+                <h3 class="section-title">Agregar Horarios Específicos</h3>
+
+                <div class="schedule-container">
+                  <div class="day-selector">
+                    <input
+                      type="checkbox"
+                      id="lunes"
+                      class="day-checkbox"
+                      data-id="1"
+                      value="Lunes"
+                    />
+                    <label for="lunes" class="day-label">Lunes</label>
+
+                    <input
+                      type="checkbox"
+                      id="martes"
+                      class="day-checkbox"
+                      data-id="2"
+                      value="Martes"
+                    />
+                    <label for="martes" class="day-label">Martes</label>
+
+                    <input
+                      type="checkbox"
+                      id="miercoles"
+                      class="day-checkbox"
+                      data-id="3"
+                      value="Miércoles"
+                    />
+                    <label for="miercoles" class="day-label">Miércoles</label>
+
+                    <input
+                      type="checkbox"
+                      id="jueves"
+                      class="day-checkbox"
+                      data-id="4"
+                      value="Jueves"
+                    />
+                    <label for="jueves" class="day-label">Jueves</label>
+
+                    <input
+                      type="checkbox"
+                      id="viernes"
+                      class="day-checkbox"
+                      data-id="5"
+                      value="Viernes"
+                    />
+                    <label for="viernes" class="day-label">Viernes</label>
+
+                    <input
+                      type="checkbox"
+                      id="sabado"
+                      class="day-checkbox"
+                      data-id="6"
+                      value="Sábado"
+                    />
+                    <label for="sabado" class="day-label">Sábado</label>
+
+                    <input
+                      type="checkbox"
+                      id="domingo"
+                      class="day-checkbox"
+                      data-id="7"
+                      value="Domingo"
+                    />
+                    <label for="domingo" class="day-label">Domingo</label>
+                  </div>
+
+                  <div class="time-inputs">
+                    <div class="form-group">
+                      <label for="sucursal">Sucursal*</label>
+                      <select id="sucursal" name="sucursal">
+                        <option value="">Seleccione...</option>
+                        {% for sucursal in sucursales %}
+                        <option value="{{ sucursal.sucursal_id }}">
+                          {{ sucursal.nombre_sucursal }}
+                        </option>
+                        {% endfor %}
+                      </select>
+                    </div>
+
+                    <div class="form-group">
+                      <label for="horario">Horario*</label>
+                      <select id="horario" name="horario">
+                        <option value="">Seleccione...</option>
+                        {% for h in horarios %}
+                        <option value="{{ h.horario_id }}">
+                          {{ h.hora_entrada|time:"H:i" }} -
+                          {{h.hora_salida|time:"H:i"}}
+                        </option>
+                        {% endfor %}
+                      </select>
+                    </div>
+
+                    <button type="button" class="add-btn" id="agregarHorario">
+                      <i class="fas fa-plus"></i>
+                    </button>
+                  </div>
+
+                  <button
+                    type="button"
+                    id="btnAddSchedule"
+                    class="btn btn-primary"
+                    style="margin-top: 8px; width: 100%"
                   >
-                    <i class="fas fa-trash"></i>
-                  </a>
-                </td>
-              </tr>
-              {% endfor %} {% else %}
-              <tr>
-                <td colspan="9" style="text-align: center">No hay datos</td>
-              </tr>
-              {% endif %}
-            </tbody>
-          </table>
-        </div>
-        
+                    <i class="fas fa-plus"></i> Agregar nuevo horario
+                  </button>
 
-      <!-- BOTONES FLOTANTES -->
-      <button id="btnAdd" class="floating-btn">
-        <i class="fas fa-plus"></i>
-      </button>
-      <button id="btnImport" class="btn-import">
-        <i class="fas fa-file-import"></i>
-      </button>
-
-      <!-- MODAL AGREGAR EMPLEADO ------------------------------------------------------------------------------------------------------->
-      <div id="employeeModal" class="modal">
-        <div class="modal-content">
-          <span class="close">&times;</span>
-          <h2 id="modalTitle">Editor Empleado</h2>
-
-          <h3 class="section-title">Datos del Empleado</h3>
-
-          <form
-            id="employeeForm"
-            method="POST"
-            action="{% url 'guardar_empleado' %}"
-          >
-            {% csrf_token %}
-            <input type="hidden" id="employeeId" />
-            <div class="form-grid">
-              <div class="form-group">
-                <label for="codigoFrappe">Código Frappe*</label>
-                <input
-                  type="text"
-                  id="codigoFrappe"
-                  name="codigoFrappe"
-                  pattern="^[0-9]+$"
-                  title="Solo números"
-                  required
-                />
-              </div>
-              <div class="form-group">
-                <label for="codigoChecador">Código Checador*</label>
-                <input
-                  type="text"
-                  id="codigoChecador"
-                  name="codigoChecador"
-                  pattern="^[0-9]+$"
-                  title="Solo números"
-                  required
-                />
-              </div>
-              <div class="form-group">
-                <label for="nombre">Nombre*</label>
-                <input
-                  type="text"
-                  id="nombre"
-                  name="nombre"
-                  pattern="^[A-Za-zÁÉÍÓÚáéíóúÑñ ]+$"
-                  title="Solo letras"
-                  required
-                />
-              </div>
-            </div>
-
-            <div class="form-grid">
-              <div class="form-group">
-                <label for="primerApellido">Primer Apellido*</label>
-                <input
-                  type="text"
-                  id="primerApellido"
-                  name="primerApellido"
-                  pattern="^[A-Za-zÁÉÍÓÚáéíóúÑñ ]+$"
-                  title="Solo letras"
-                  required
-                />
-              </div>
-              <div class="form-group">
-                <label for="segundoApellido">Segundo Apellido</label>
-                <input
-                  type="text"
-                  id="segundoApellido"
-                  name="segundoApellido"
-                  pattern="^[A-Za-zÁÉÍÓÚáéíóúÑñ ]+$"
-                  title="Solo letras"
-                  required
-                />
-              </div>
-              <div class="form-group">
-                <label for="email">Email*</label>
-                <input type="email" id="email" name="email" required />
-              </div>
-            </div>
-
-            <h3 class="section-title">Agregar Horarios Específicos</h3>
-
-            <div class="schedule-container">
-              <div class="day-selector">
-                <input
-                  type="checkbox"
-                  id="lunes"
-                  class="day-checkbox"
-                  data-id="1"
-                  value="Lunes"
-                />
-                <label for="lunes" class="day-label">Lunes</label>
-
-                <input
-                  type="checkbox"
-                  id="martes"
-                  class="day-checkbox"
-                  data-id="2"
-                  value="Martes"
-                />
-                <label for="martes" class="day-label">Martes</label>
-
-                <input
-                  type="checkbox"
-                  id="miercoles"
-                  class="day-checkbox"
-                  data-id="3"
-                  value="Miércoles"
-                />
-                <label for="miercoles" class="day-label">Miércoles</label>
-
-                <input
-                  type="checkbox"
-                  id="jueves"
-                  class="day-checkbox"
-                  data-id="4"
-                  value="Jueves"
-                />
-                <label for="jueves" class="day-label">Jueves</label>
-
-                <input
-                  type="checkbox"
-                  id="viernes"
-                  class="day-checkbox"
-                  data-id="5"
-                  value="Viernes"
-                />
-                <label for="viernes" class="day-label">Viernes</label>
-
-                <input
-                  type="checkbox"
-                  id="sabado"
-                  class="day-checkbox"
-                  data-id="6"
-                  value="Sábado"
-                />
-                <label for="sabado" class="day-label">Sábado</label>
-
-                <input
-                  type="checkbox"
-                  id="domingo"
-                  class="day-checkbox"
-                  data-id="7"
-                  value="Domingo"
-                />
-                <label for="domingo" class="day-label">Domingo</label>
-              </div>
-
-              <div class="time-inputs">
-                <div class="form-group">
-                  <label for="sucursal">Sucursal*</label>
-                  <select id="sucursal" name="sucursal">
-                    <option value="">Seleccione...</option>
-                    {% for sucursal in sucursales %}
-                    <option value="{{ sucursal.sucursal_id }}">
-                      {{ sucursal.nombre_sucursal }}
-                    </option>
-                    {% endfor %}
-                  </select>
+                  <div class="schedule-labels" id="horariosAgregados">
+                    <div class="empty-schedule">No hay horarios agregados</div>
+                  </div>
                 </div>
 
-                <div class="form-group">
-                  <label for="horario">Horario*</label>
-                  <select id="horario" name="horario">
-                    <option value="">Seleccione...</option>
-                    {% for h in horarios %}
-                    <option value="{{ h.horario_id }}">
-                      {{ h.hora_entrada|time:"H:i" }} -
-                      {{h.hora_salida|time:"H:i"}}
-                    </option>
-                    {% endfor %}
-                  </select>
+                <div class="form-actions">
+                  <button type="submit" class="btn btn-success"> <i class="fas fa-save"></i> Guardar
+                  </button>
+                  <button type="button" class="btn btn-cancel">
+                    <i class="fas fa-times"></i> Cancelar
+                  </button>
                 </div>
+              </form>
+            </div>
+          </div>
 
-                <button type="button" class="add-btn" id="agregarHorario">
-                  <i class="fas fa-plus"></i>
-                </button>
-              </div>
-
-              <!-- BOTÓN AGREGAR NUEVO HORARIO -->
-              <button
-                type="button"
-                id="btnAddSchedule"
-                class="btn btn-primary"
-                style="margin-top: 8px; width: 100%"
+          <div id="scheduleModal" class="modal">
+            <div class="modal-content small">
+              <span class="close">&times;</span>
+              <h2>Agregar Horario</h2>
+              <form
+                id="scheduleForm"
+                method="post"
+                action="{% url 'crear_horario' %}"
               >
-                <i class="fas fa-plus"></i> Agregar nuevo horario
-              </button>
-
-              <div class="schedule-labels" id="horariosAgregados">
-                <div class="empty-schedule">No hay horarios agregados</div>
-              </div>
+                {% csrf_token %}
+                <div class="form-row">
+                  <div class="form-group">
+                    <label for="horaEntrada">Hora de entrada*</label>
+                    <input
+                      type="time"
+                      id="horaEntrada"
+                      name="horaEntrada"
+                      required
+                    />
+                  </div>
+                  <div class="form-group">
+                    <label for="horaSalida">Hora de salida*</label>
+                    <input type="time" id="horaSalida" name="horaSalida" required />
+                  </div>
+                </div>
+                <div class="form-row">
+                  <label>Cruza noche:</label>
+                  <div class="radio-group">
+                    <label class="radio-option">
+                      <input type="radio" name="cruzaNoche" value="si" /> Sí
+                    </label>
+                    <label class="radio-option">
+                      <input type="radio" name="cruzaNoche" value="no" /> No
+                    </label>
+                  </div>
+                </div>
+                <div class="form-row">
+                  <div class="form-group">
+                    <label for="descripcionHorario">Descripción (opcional)</label>
+                    <input
+                      type="text"
+                      id="descripcionHorario"
+                      name="descripcionHorario"
+                    />
+                  </div>
+                </div>
+                <div class="form-actions">
+                  <button type="submit" class="btn btn-success">
+                    <i class="fas fa-save"></i> Guardar
+                  </button>
+                  <button
+                    type="button"
+                    id="cancelAddSchedule"
+                    class="btn btn-cancel"
+                  >
+                    <i class="fas fa-times"></i> Cancelar
+                  </button>
+                </div>
+              </form>
             </div>
-
-            <div class="form-actions">
-  <button type="submit" class="btn btn-success"> <i class="fas fa-save"></i> Guardar
-  </button>
-              <button type="button" class="btn btn-cancel">
-                <i class="fas fa-times"></i> Cancelar
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-
-      <!-- MODAL AGREGAR HORARIO ----------------------------------------------------------------------------------------------------------------->
-      <div id="scheduleModal" class="modal">
-        <div class="modal-content small">
-          <span class="close">&times;</span>
-          <h2>Agregar Horario</h2>
-          <form
-            id="scheduleForm"
-            method="post"
-            action="{% url 'crear_horario' %}"
-          >
-            {% csrf_token %}
-            <div class="form-row">
-              <div class="form-group">
-                <label for="horaEntrada">Hora de entrada*</label>
-                <input
-                  type="time"
-                  id="horaEntrada"
-                  name="horaEntrada"
-                  required
-                />
-              </div>
-              <div class="form-group">
-                <label for="horaSalida">Hora de salida*</label>
-                <input type="time" id="horaSalida" name="horaSalida" required />
-              </div>
-            </div>
-            <div class="form-row">
-              <label>Cruza noche:</label>
-              <div class="radio-group">
-                <label class="radio-option">
-                  <input type="radio" name="cruzaNoche" value="si" /> Sí
-                </label>
-                <label class="radio-option">
-                  <input type="radio" name="cruzaNoche" value="no" /> No
-                </label>
-              </div>
-            </div>
-            <div class="form-row">
-              <div class="form-group">
-                <label for="descripcionHorario">Descripción (opcional)</label>
-                <input
-                  type="text"
-                  id="descripcionHorario"
-                  name="descripcionHorario"
-                />
-              </div>
-            </div>
-            <div class="form-actions">
-              <button type="submit" class="btn btn-success">
-                <i class="fas fa-save"></i> Guardar
-              </button>
-              <button
-                type="button"
-                id="cancelAddSchedule"
-                class="btn btn-cancel"
-              >
-                <i class="fas fa-times"></i> Cancelar
-              </button>
-            </div>
-          </form>
+          </div>
         </div>
       </div>
     </div>
     
-<!--PERFIL-->
-<div id="editEmployeeModal" class="modal">
-    <div class="modal-content">
+    <div id="editEmployeeModal" class="modal">
+      <div class="modal-content">
         <span class="close">&times;</span> 
         <h2 id="modalTitleEdit">Editar Empleado</h2>
         
         <form id="employeeDataForm" method="POST">
 
-            {% csrf_token %} 
-            <input type="hidden" id="employeeIdData" name="empleado_id"> 
+          {% csrf_token %} 
+          <input type="hidden" id="employeeIdData" name="empleado_id"> 
+          
+          <h3 class="section-title">Datos del Empleado</h3>
+          
+          <div class="form-row profile-header-grid">
             
-            <h3 class="section-title">Datos del Empleado</h3>
-            
-            <div class="form-row profile-header-grid">
-                
-                <div style="flex-grow: 1;">
-                    <div class="form-grid">
-                        
-                        <div class="form-group">
-                            <label for="employeeIndexDisplay">ID de Empleado</label>
-                            <input type="text" id="employeeIndexDisplay" readonly>
-                        </div>
-                        <div class="form-group">
-                            <label for="codigoFrappeEdit">Código de Frappe</label>
-                            <input type="text" id="codigoFrappeEdit" name="codigoFrappeEdit" required>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label for="codigoChecadorEdit">Código Checador</label>
-                            <input type="text" id="codigoChecadorEdit" name="codigoChecadorEdit" required>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label for="nombreEdit">Nombre</label>
-                            <input type="text" id="nombreEdit" name="nombreEdit" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="primerApellidoEdit">Primer Apellido</label>
-                            <input type="text" id="primerApellidoEdit" name="primerApellidoEdit" required>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label for="segundoApellidoEdit">Segundo Apellido</label>
-                            <input type="text" id="segundoApellidoEdit" name="segundoApellidoEdit">
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <h3 class="section-title">Información de Contacto</h3>
-
-            <div class="form-grid" style="grid-template-columns: 2fr 1fr;">
+            <div style="flex-grow: 1;">
+              <div class="form-grid">
                 
                 <div class="form-group">
-                    <label for="emailEdit">Correo Electrónico</label>
-                    <input type="email" id="emailEdit" name="emailEdit" required>
+                  <label for="employeeIndexDisplay">ID de Empleado</label>
+                  <input type="text" id="employeeIndexDisplay" readonly>
                 </div>
+                <div class="form-group">
+                  <label for="codigoFrappeEdit">Código de Frappe</label>
+                  <input type="text" id="codigoFrappeEdit" name="codigoFrappeEdit" required>
+                </div>
+                
+                <div class="form-group">
+                  <label for="codigoChecadorEdit">Código Checador</label>
+                  <input type="text" id="codigoChecadorEdit" name="codigoChecadorEdit" required>
+                </div>
+                
+                <div class="form-group">
+                  <label for="nombreEdit">Nombre</label>
+                  <input type="text" id="nombreEdit" name="nombreEdit" required>
+                </div>
+                <div class="form-group">
+                  <label for="primerApellidoEdit">Primer Apellido</label>
+                  <input type="text" id="primerApellidoEdit" name="primerApellidoEdit" required>
+                </div>
+                
+                <div class="form-group">
+                  <label for="segundoApellidoEdit">Segundo Apellido</label>
+                  <input type="text" id="segundoApellidoEdit" name="segundoApellidoEdit">
+                </div>
+              </div>
             </div>
+          </div>
+          
+          <h3 class="section-title">Información de Contacto</h3>
 
-            <div class="form-actions" style="margin-top: 20px; border-bottom: 1px solid #ddd; padding-bottom: 20px;">
-                <button type="submit" class="btn btn-success">
-                    <i class="fas fa-save"></i> Guardar Datos
-                </button>
-                <button type="button" class="btn btn-danger btn-cancel-data">
-                    <i class="fas fa-times"></i> Cancelar
-                </button>
+          <div class="form-grid" style="grid-template-columns: 2fr 1fr;">
+            
+            <div class="form-group">
+              <label for="emailEdit">Correo Electrónico</label>
+              <input type="email" id="emailEdit" name="emailEdit" required>
             </div>
+          </div>
+
+          <div class="form-actions" style="margin-top: 20px; border-bottom: 1px solid #ddd; padding-bottom: 20px;">
+            <button type="submit" class="btn btn-success">
+              <i class="fas fa-save"></i> Guardar Datos
+            </button>
+            <button type="button" class="btn btn-danger btn-cancel-data">
+              <i class="fas fa-times"></i> Cancelar
+            </button>
+          </div>
         </form>
         
         <h3 class="section-title" style="margin-top: 20px;">Agregar Horarios Específicos</h3>
         <form id="scheduleDataForm" method="POST">
-            {% csrf_token %}
+          {% csrf_token %}
         
-            <input type="hidden" id="employeeIdSchedule" name="empleado_id"> 
+          <input type="hidden" id="employeeIdSchedule" name="empleado_id"> 
         
-            <div class="schedule-container">
-                
-                <div class="day-selector">
-                    <input type="checkbox" id="lunesEdit" class="day-checkbox" data-id="1"><label for="lunesEdit" class="day-label">Lunes</label>
-                    <input type="checkbox" id="martesEdit" class="day-checkbox" data-id="2"><label for="martesEdit" class="day-label">Martes</label>
-                    <input type="checkbox" id="miercolesEdit" class="day-checkbox" data-id="3"><label for="miercolesEdit" class="day-label">Miércoles</label>
-                    <input type="checkbox" id="juevesEdit" class="day-checkbox" data-id="4"><label for="juevesEdit" class="day-label">Jueves</label>
-                    <input type="checkbox" id="viernesEdit" class="day-checkbox" data-id="5"><label for="viernesEdit" class="day-label">Viernes</label>
-                    <input type="checkbox" id="sabadoEdit" class="day-checkbox" data-id="6"><label for="sabadoEdit" class="day-label">Sábado</label>
-                    <input type="checkbox" id="domingoEdit" class="day-checkbox" data-id="7"><label for="domingoEdit" class="day-label">Domingo</label>
-                </div>
-                
-                <div class="time-inputs">
-                    
-                    <div class="form-group">
-                        <label for="sucursalEdit">Sucursal*</label>
-                        <select id="sucursalEdit" name="sucursalEdit" >
-                            <option value="" disabled selected>Cargando...</option>
-                        </select>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="horarioEdit">Horario*</label>
-                        <select id="horarioEdit" name="horarioEdit" >
-                            <option value="" disabled selected>Cargando...</option>
-                        </select>
-                    </div>
-                    
-                    <button type="button" class="add-btn" id="agregarHorarioEdit">
-                        <i class="fas fa-plus"></i>
-                    </button>
-                </div>
-                
-                <button type="button" id="btnAddScheduleFromEdit" class="btn btn-primary"style="margin-top: 8px; width: 100%">
-                    <i class="fas fa-plus"></i> Agregar nuevo horario
-                </button>
-                <div id="horariosFlexiblesAdmin" class="admin-schedule-list"> 
-                    <p class="text-muted" style="text-align: center;">No hay horarios flexibles para administrar.</p>
-                </div>
-
-                <div class="schedule-labels" id="horariosAgregadosEdit">
-                    <div class="empty-schedule">No hay horarios agregados</div>
-                </div>
-
-                <div class="form-actions" style="margin-top: 20px;">
-                    <button type="submit" class="btn btn-success" id="btnGuardarHorarios">
-                        <i class="fas fa-save"></i> Guardar Horarios
-                    </button>
-                    <button type="button" id="btnCancelarHorarios" class="btn btn-danger">
-                        <i class="fas fa-times"></i> Cancelar
-                    </button>
-                </div>
+          <div class="schedule-container">
+            
+            <div class="day-selector">
+              <input type="checkbox" id="lunesEdit" class="day-checkbox" data-id="1"><label for="lunesEdit" class="day-label">Lunes</label>
+              <input type="checkbox" id="martesEdit" class="day-checkbox" data-id="2"><label for="martesEdit" class="day-label">Martes</label>
+              <input type="checkbox" id="miercolesEdit" class="day-checkbox" data-id="3"><label for="miercolesEdit" class="day-label">Miércoles</label>
+              <input type="checkbox" id="juevesEdit" class="day-checkbox" data-id="4"><label for="juevesEdit" class="day-label">Jueves</label>
+              <input type="checkbox" id="viernesEdit" class="day-checkbox" data-id="5"><label for="viernesEdit" class="day-label">Viernes</label>
+              <input type="checkbox" id="sabadoEdit" class="day-checkbox" data-id="6"><label for="sabadoEdit" class="day-label">Sábado</label>
+              <input type="checkbox" id="domingoEdit" class="day-checkbox" data-id="7"><label for="domingoEdit" class="day-label">Domingo</label>
             </div>
+            
+            <div class="time-inputs">
+              
+              <div class="form-group">
+                <label for="sucursalEdit">Sucursal*</label>
+                <select id="sucursalEdit" name="sucursalEdit" >
+                  <option value="" disabled selected>Cargando...</option>
+                </select>
+              </div>
+              
+              <div class="form-group">
+                <label for="horarioEdit">Horario*</label>
+                <select id="horarioEdit" name="horarioEdit" >
+                  <option value="" disabled selected>Cargando...</option>
+                </select>
+              </div>
+              
+              <button type="button" class="add-btn" id="agregarHorarioEdit">
+                <i class="fas fa-plus"></i>
+              </button>
+            </div>
+            
+            <button type="button" id="btnAddScheduleFromEdit" class="btn btn-primary"style="margin-top: 8px; width: 100%">
+              <i class="fas fa-plus"></i> Agregar nuevo horario
+            </button>
+            <div id="horariosFlexiblesAdmin" class="admin-schedule-list"> 
+              <p class="text-muted" style="text-align: center;">No hay horarios flexibles para administrar.</p>
+            </div>
+
+            <div class="schedule-labels" id="horariosAgregadosEdit">
+            </div>
+
+            <div class="form-actions" style="margin-top: 20px;">
+              <button type="submit" class="btn btn-success" id="btnGuardarHorarios">
+                <i class="fas fa-save"></i> Guardar Horarios
+              </button>
+              <button type="button" id="btnCancelarHorarios" class="btn btn-danger">
+                <i class="fas fa-times"></i> Cancelar
+              </button>
+            </div>
+          </div>
         </form>
+      </div>
     </div>
-</div>
-<!--FIN-->
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        // 1. Selecciona todos los mensajes de alerta (clase .alerta)
-        const alerts = document.querySelectorAll('.alerta');
+    document.addEventListener('DOMContentLoaded', function() {
+        // 1. Selecciona todos los mensajes de alerta (clase .alerta)
+        const alerts = document.querySelectorAll('.alerta');
 
-        // 2. Define el tiempo de espera (5000 milisegundos = 5 segundos)
-        const delay = 2000; 
-        
-        // 3. Itera sobre cada alerta para programar su ocultamiento
-        alerts.forEach(alerta => {
-            setTimeout(() => {
-                // Inicia la transición de desvanecimiento
-                alerta.style.opacity = '0';
-                alerta.style.transition = 'opacity 0.5s ease-out';
-                
-                // Oculta completamente el elemento después de que termine la transición (0.5s)
-                setTimeout(() => {
-                    alerta.style.display = 'none';
-                }, 500); 
+        // 2. Define el tiempo de espera (5000 milisegundos = 5 segundos)
+        const delay = 2000; 
+        
+        // 3. Itera sobre cada alerta para programar su ocultamiento
+        alerts.forEach(alerta => {
+            setTimeout(() => {
+                // Inicia la transición de desvanecimiento
+                alerta.style.opacity = '0';
+                alerta.style.transition = 'opacity 0.5s ease-out';
+                
+                // Oculta completamente el elemento después de que termine la transición (0.5s)
+                setTimeout(() => {
+                    alerta.style.display = 'none';
+                }, 500); 
 
-            }, delay);
-        });
-    });
+            }, delay);
+        });
+    });
 </script>
-    <!-- Agregar estas líneas antes de tus scripts -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
 
-    <script src="{% static 'js/menu.js' %}"></script>
-    <script src="{% static 'js/gestion_empleados.js' %}"></script>
-  </body>
+    <script src="{% static 'js/menu.js' %}"></script>
+    <script src="{% static 'js/gestion_empleados.js' %}"></script>
+  </body>
 </html>

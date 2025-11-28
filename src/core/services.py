@@ -33,21 +33,19 @@ def autenticar_usuario(request, email, password):
     except User.DoesNotExist:
         return None
 
-# --- FUSIÓN: Versión de 'crear_empleado_service' de tu compañera (CON VALIDACIÓN) ---
 def crear_empleado_service(data):
+    """Crea un empleado y sus asignaciones, validando duplicados en registros activos."""
     print("[DEBUG] POST crudo:", dict(data))
 
-    # 1. Validar duplicados por código o email
+    # 1. Validar duplicados (objects ya filtra por is_deleted=False gracias al Manager)
     if Empleado.objects.filter(codigo_frappe=data.get("codigoFrappe")).exists():
-        raise ValidationError("Ya existe un empleado con este código de frappe.")
-
+        raise ValidationError("Ya existe un empleado activo con este código de frappe.")
     if Empleado.objects.filter(codigo_checador=data.get("codigoChecador")).exists():
-        raise ValidationError("Ya existe un empleado con este código de checador.")
-
+        raise ValidationError("Ya existe un empleado activo con este código de checador.")
     if data.get("email") and Empleado.objects.filter(email=data.get("email")).exists():
-        raise ValidationError("Ya existe un empleado con este email.")
+        raise ValidationError("Ya existe un empleado activo con este email.")
 
-    # 2. Crear empleado
+    # 2. Crear empleado (por defecto es activo)
     empleado = Empleado.objects.create(
         codigo_frappe=data.get("codigoFrappe"),
         codigo_checador=data.get("codigoChecador"),
@@ -87,30 +85,42 @@ def crear_empleado_service(data):
             except Exception as e:
                 print(f"[ERROR] No se pudo crear asignación: {e}")
     return empleado
-# --- FIN FUSIÓN ---
 
 def listar_empleados():
+    """
+    Lista empleados activos que tienen al menos una asignación de horario.
+    NOTA: Se corrige la consulta original, asumiendo que el objetivo es obtener
+    los datos de Empleado a través de su Asignación. Usa el filtro is_deleted.
+    """
+    # Consulta optimizada: trae asignaciones relacionadas con empleado/sucursal/horario
+    empleados_qs = AsignacionHorario.objects.select_related("empleado", "sucursal", "horario").all()
 
-    empleados = Empleado.objects.select_related("empleado", "sucursal", "horario").all()
-
-    # Creamos una lista de diccionarios para usar en el template
+    # Filtramos y desduplicamos en Python
     lista_empleados = []
-    for a in empleados:
-        lista_empleados.append(
-            {
-                "empleado_id": a.empleado.empleado_id,
-                "nombre": a.empleado.nombre,
-                "apellido_paterno": a.empleado.apellido_paterno,
-                "apellido_materno": a.empleado.apellido_materno,
-                "email": a.empleado.email,
-                "codigo_frappe": a.empleado.codigo_frappe,
-                "codigo_checador": a.empleado.codigo_checador,
-            }
-        )
+    empleados_procesados = set()
+
+    for a in empleados_qs:
+        emp = a.empleado
+        # CRUCIAL: Solo incluimos si el empleado NO está eliminado (is_deleted=False)
+        # y si aún no ha sido procesado
+        if not emp.is_deleted and emp.empleado_id not in empleados_procesados:
+            lista_empleados.append(
+                {
+                    "empleado_id": emp.empleado_id,
+                    "nombre": emp.nombre,
+                    "apellido_paterno": emp.apellido_paterno,
+                    "apellido_materno": emp.apellido_materno,
+                    "email": emp.email,
+                    "codigo_frappe": emp.codigo_frappe,
+                    "codigo_checador": emp.codigo_checador,
+                }
+            )
+            empleados_procesados.add(emp.empleado_id)
+            
     return lista_empleados
 
-# --- FUSIÓN: Versión de 'crear_horario_service' de tu compañera (CON VALIDACIÓN) ---
 def crear_horario_service(data):
+    """Crea un nuevo horario validando que no exista uno con la misma configuración."""
     hora_entrada = data.get("horaEntrada")
     hora_salida = data.get("horaSalida")
     cruza_medianoche = True if data.get("cruzaNoche") == "si" else False
@@ -131,13 +141,13 @@ def crear_horario_service(data):
         cruza_medianoche=cruza_medianoche,
         descripcion_horario=descripcion,
     )
-# --- FIN FUSIÓN ---
 
 # =================================================================
-# === FUNCIONES DE GESTIÓN DE ROLES (DE TU COMPAÑERA) ===
+# === FUNCIONES DE GESTIÓN DE ROLES (USAN Empleado.objects para activos) ===
 # =================================================================
 
 def asignar_rol_service(data):
+    """Asigna/edita roles de Administrador/Manager a un Empleado activo."""
     admin_id = data.get("adminId") 
     nombre = data.get("firstName")
     apellido = data.get("firstLastName")
@@ -147,144 +157,120 @@ def asignar_rol_service(data):
     rol = data.get("role")
 
     if admin_id:
-        # Modo edición
+        # Modo edición: busca solo activos
         try:
             empleado = Empleado.objects.select_related("user").get(pk=admin_id)
         except Empleado.DoesNotExist:
-            return {"error": "Empleado no encontrado."}
+            return {"error": "Empleado activo no encontrado."} # ⬅️ Corregido a 'activo'
 
         user = empleado.user
-        if not user:
-            return {"error": "Este empleado no tiene usuario asociado."}
+        if not user: return {"error": "Este empleado no tiene usuario asociado."}
 
         # Actualizar datos
-        user.first_name = nombre
-        user.last_name = apellido
-        user.email = correo
+        user.first_name = nombre; user.last_name = apellido; user.email = correo
         user.save()
 
         # Actualizar grupo
         user.groups.clear()
         if rol == "Admin":
-            grupo, _ = Group.objects.get_or_create(name="Admin")
-            user.is_superuser = True
+             grupo, _ = Group.objects.get_or_create(name="Admin")
+             user.is_superuser = True
         else:
-            grupo, _ = Group.objects.get_or_create(name="Manager")
-            user.is_superuser = False
+             grupo, _ = Group.objects.get_or_create(name="Manager")
+             user.is_superuser = False
         user.is_staff = True
         user.groups.add(grupo)
         user.save()
 
         return {"success": f"Administrador '{user.username}' actualizado correctamente."}
 
-    # Validar existencia del empleado
+    # Modo creación: busca solo activos
     try:
-        empleado = Empleado.objects.get(codigo_frappe=codigo_frappe)
+        empleado = Empleado.objects.get(codigo_frappe=codigo_frappe) # Busca activo
     except Empleado.DoesNotExist:
-        return {"error": "No existe un empleado con ese código Frappe."}
+        return {"error": "No existe un empleado ACTIVO con ese código Frappe."}
 
     # Validar si ya tiene usuario vinculado
-    if empleado.user:
-        return {"error": "Este empleado ya tiene un usuario asignado."}
-
+    if empleado.user: return {"error": "Este empleado ya tiene un usuario asignado."}
     # Validar correo repetido
-    if User.objects.filter(email=correo).exists():
-        return {"error": "Este correo ya está registrado."}
+    if User.objects.filter(email=correo).exists(): return {"error": "Este correo ya está registrado."}
 
-    # Crear usuario
+    # Crear usuario y vincular...
     username = correo.split("@")[0]
     alphabet = string.ascii_letters + string.digits
-    password = ''.join(secrets.choice(alphabet) for i in range(12)) # Creamos una contraseña de 12 caracteres
+    password = ''.join(secrets.choice(alphabet) for i in range(12))
 
     user = User.objects.create_user(
-        username=username,
-        email=correo,
-        password=password,
-        first_name=nombre,
-        last_name=apellido,
+        username=username, email=correo, password=password, first_name=nombre, last_name=apellido,
     )
 
     # Asignar grupo y permisos
     if rol == "Admin":
-        user.is_staff = True
-        user.is_superuser = True
+        user.is_staff = True; user.is_superuser = True
         grupo, _ = Group.objects.get_or_create(name="Admin")
     else:
-        user.is_staff = True
-        user.is_superuser = False
+        user.is_staff = True; user.is_superuser = False
         grupo, _ = Group.objects.get_or_create(name="Manager")
 
-    user.save()
-    user.groups.add(grupo)
-
-    # Vincular con el empleado
-    empleado.user = user
-    empleado.save()
+    user.save(); user.groups.add(grupo)
+    empleado.user = user; empleado.save()
 
     # Enviar correo con las credenciales
     asunto = "Credenciales de acceso al sistema"
     mensaje = (
-        f"Hola {nombre},\n\n"
-        f"Se te ha creado un usuario en el sistema.\n\n"
-        f"Usuario: {correo}\n"
-        f"Contraseña: {password}\n\n"
-        f"Por favor, ingresa con el correo y contraseña que se te asigno.\n\n"
-        f"Saludos."
+        f"Hola {nombre},\n\nSe te ha creado un usuario en el sistema.\n\n"
+        f"Usuario: {correo}\nContraseña: {password}\n\n"
+        f"Por favor, ingresa con el correo y contraseña que se te asigno.\n\nSaludos."
     )
-
-    send_mail(
-        asunto,
-        mensaje,
-        settings.DEFAULT_FROM_EMAIL,
-        [correo],
-        fail_silently=False,
-    )
+    send_mail(asunto, mensaje, settings.DEFAULT_FROM_EMAIL, [correo], fail_silently=False)
 
     return {"success": f"Usuario '{username}' creado y vinculado correctamente."}
 
 def obtener_roles_service():
-    # Filtra empleados que tienen usuario vinculado
+    # 1. Filtra empleados que tienen un usuario de Django asociado (es decir, tienen un rol)
     empleados_con_usuario = (
         Empleado.objects
-        .select_related("user")  # optimiza consultas
-        .filter(user__isnull=False)
+        .select_related("user")
+        .filter(user__isnull=False) # SOLO los que tienen rol asignado
     )
 
     resultado = []
     for emp in empleados_con_usuario:
-        # Detectar rol del usuario (Admin o Manager)
+        # 2. Obtiene los nombres de los grupos a los que pertenece el usuario
         grupos = emp.user.groups.values_list("name", flat=True)
-        rol = "Admin" if "Admin" in grupos else "Manager" if "Manager" in grupos else "—"
+        
+        # 3. Determina el rol a mostrar
+        rol = "—" # Valor por defecto
 
+        if "Admin" in grupos:
+            rol = "Admin"
+        elif "Manager" in grupos:
+            rol = "Manager"
+        # Nota: Si un usuario está en ambos grupos, esta lógica lo catalogará como "Admin".
+        
         resultado.append({
             "id": emp.empleado_id,
             "nombre_completo": f"{emp.nombre} {emp.apellido_paterno or ''} {emp.apellido_materno or ''}".strip(),
             "correo": emp.user.email,
             "codigo_frappe": emp.codigo_frappe,
-            "rol": rol,
+            "rol": rol, # Aquí se muestra si es "Admin" o "Manager"
         })
 
     return resultado
 
 def obtener_admin_por_id_service(empleado_id):
     try:
-        empleado = Empleado.objects.select_related("user").get(pk=empleado_id)
+        empleado = Empleado.objects.select_related("user").get(pk=empleado_id) # Busca activo
         user = empleado.user
 
-        if not user:
-            return None
+        if not user: return None
 
         grupos = user.groups.values_list("name", flat=True)
         rol = "Admin" if "Admin" in grupos else "Manager" if "Manager" in grupos else ""
 
         return {
-            "empleado_id": empleado.empleado_id,
-            "firstName": empleado.nombre,
-            "firstLastName": empleado.apellido_paterno,
-            "email": user.email,
-            "frappeCode": empleado.codigo_frappe,
-            "role": rol,
-            "username": user.username,
+            "empleado_id": empleado.empleado_id, "firstName": empleado.nombre, "firstLastName": empleado.apellido_paterno,
+            "email": user.email, "frappeCode": empleado.codigo_frappe, "role": rol, "username": user.username,
         }
 
     except Empleado.DoesNotExist:
@@ -292,54 +278,35 @@ def obtener_admin_por_id_service(empleado_id):
 
 def eliminar_admin_service(empleado_id):
     try:
-        empleado = Empleado.objects.select_related("user").get(pk=empleado_id)
+        empleado = Empleado.objects.select_related("user").get(pk=empleado_id) # Busca activo
     except Empleado.DoesNotExist:
-        return {"error": "Empleado no encontrado."}
+        return {"error": "Empleado activo no encontrado."} # ⬅️ Corregido
 
     user = empleado.user
-    if not user:
-        return {"error": "Este empleado no tiene usuario asociado."}
+    if not user: return {"error": "Este empleado no tiene usuario asociado."}
 
-    # Guardamos nombre antes de borrar
     username = user.username
-
-    # 1️⃣ Desvincular empleado
-    empleado.user = None
-    empleado.save()
-
-    # 2️⃣ Eliminar usuario de Django Auth
+    empleado.user = None; empleado.save()
     user.delete()
 
     return {"success": f"El administrador '{username}' fue eliminado correctamente."}
 
 # --- INICIA CORRECCIÓN 1: NUEVA FUNCIÓN AUXILIAR ---
 def map_device_to_sucursal(device_id_str: str) -> str:
-    """
-    Convierte un 'device_id' (texto) en un nombre de Sucursal estandarizado.
-    """
-    if device_id_str is None:
-        return 'Desconocida'
-        
+    """Convierte un 'device_id' (texto) en un nombre de Sucursal estandarizado."""
+    if device_id_str is None: return 'Desconocida'
     device_id = str(device_id_str).lower()
     
-    # Mapeo basado en los patrones de tu api_client
-    if 'villas' in device_id or 'vlla' in device_id:
-        return 'Villas'
-    if '31pte' in device_id or '31' in device_id or 'pte' in device_id:
-        return '31pte'
-    if 'nave' in device_id or 'nav' in device_id:
-        return 'Nave'
-    if 'rioblanco' in device_id or 'rio' in device_id or 'blanco' in device_id:
-        return 'RioBlanco'
-        
-    # Fallback por si el device_id no coincide con los patrones conocidos
+    if 'villas' in device_id or 'vlla' in device_id: return 'Villas'
+    if '31pte' in device_id or '31' in device_id or 'pte' in device_id: return '31pte'
+    if 'nave' in device_id or 'nav' in device_id: return 'Nave'
+    if 'rioblanco' in device_id or 'rio' in device_id or 'blanco' in device_id: return 'RioBlanco'
     return 'Desconocida'
 # --- FIN CORRECCIÓN 1 ---
 
 #Reporte de Horas y Lista de Asistencias
 class AttendanceProcessor:
     
-    # --- INICIA CORRECCIÓN 2: process_checkins_to_dataframe ---
     def process_checkins_to_dataframe(self, checkin_data, start_date, end_date, employee_codes=None):
         df = pd.DataFrame(checkin_data) if checkin_data else pd.DataFrame(columns=['employee', 'time', 'device_id'])
         
@@ -348,19 +315,11 @@ class AttendanceProcessor:
             df["dia"] = df["time"].dt.date
             df["checado_time"] = df["time"].dt.time
             
-            # Si 'device_id' no vino en la data (aunque debería), créalo vacío
-            if 'device_id' not in df.columns:
-                df['device_id'] = None
-                
-            # Usa la función de mapeo para crear la columna SUCURSAL
-            # ¡Esta es la corrección clave!
+            if 'device_id' not in df.columns: df['device_id'] = None
             df['Sucursal'] = df['device_id'].apply(map_device_to_sucursal)
-            
         else:
-             # Asegura que las columnas existan si el df de checkin_data estaba vacío
             if 'device_id' not in df.columns: df['device_id'] = None
             if 'Sucursal' not in df.columns: df['Sucursal'] = None
-
 
         all_employees = employee_codes if employee_codes else (df["employee"].unique() if not df.empty else [])
         if not all_employees: return pd.DataFrame()
@@ -370,12 +329,8 @@ class AttendanceProcessor:
 
         if not df.empty:
             stats = df.groupby(["employee", "dia"]).agg(
-                checado_primero=('checado_time', 'min'),
-                checado_ultimo=('checado_time', 'max'),
-                checados_count=('time', 'count'),
-                # Agregamos 'Sucursal' y 'device_id' al agg
-                Sucursal=('Sucursal', 'first'), 
-                device_id=('device_id', 'first') 
+                checado_primero=('checado_time', 'min'), checado_ultimo=('checado_time', 'max'),
+                checados_count=('time', 'count'), Sucursal=('Sucursal', 'first'), device_id=('device_id', 'first') 
             ).reset_index()
             
             def calc_duration(r):
@@ -397,26 +352,23 @@ class AttendanceProcessor:
         final_df['duration'] = final_df['duration'].fillna(pd.Timedelta(0))
         final_df['checados_count'] = final_df['checados_count'].fillna(0).astype(int)
         
-        # Si la sucursal quedó en Nulo después del merge (para días sin checadas),
-        # intentamos rellenarla con la última sucursal conocida de ese empleado.
         final_df['Sucursal'] = final_df.groupby('employee')['Sucursal'].ffill().bfill()
-        final_df['Sucursal'] = final_df['Sucursal'].fillna('Sin Asignar') # Relleno final
+        final_df['Sucursal'] = final_df['Sucursal'].fillna('Sin Asignar')
+
+        # CRUCIAL: Solo mapear empleados ACTIVOS para los reportes
+        empleados_activos_qs = Empleado.objects.filter(codigo_frappe__in=all_employees)
+        emp_map = {str(e.codigo_frappe): f"{e.nombre} {e.apellido_paterno}" for e in empleados_activos_qs}
         
-        emp_map = {str(e.codigo_frappe): f"{e.nombre} {e.apellido_paterno}" for e in Empleado.objects.filter(codigo_frappe__in=all_employees)}
         final_df['Nombre'] = final_df['employee'].map(emp_map).fillna(final_df['employee'])
         
         final_df["dia_obj"] = pd.to_datetime(final_df["dia"])
         final_df["dia_semana"] = final_df["dia_obj"].dt.day_name()
         return final_df
-    # --- FIN CORRECCIÓN 2 ---
 
 
-    # --- INICIA CORRECCIÓN 3: analizar_asistencia_con_horarios ---
     def analizar_asistencia_con_horarios(self, df: pd.DataFrame, start_date_str: str, end_date_str: str) -> pd.DataFrame:
         if df.empty: return df
         
-        # 'Sucursal' ya existe gracias a la función anterior (process_checkins_to_dataframe)
-        # Solo necesitamos crear las otras columnas
         for col in ["horas_esperadas", "horario_entrada", "horario_salida"]:
             if 'horas' in col: df[col] = pd.Timedelta(0)
             else: df[col] = None
@@ -426,18 +378,17 @@ class AttendanceProcessor:
         
         start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
         
-        # NOTA: obtener_horario_empleado_completo debe devolver el horario general del empleado,
-        # ya que la sucursal del DÍA ya la tenemos.
-        horarios_periodo = {e: obtener_horario_empleado_completo(e, start_date.strftime('%Y-%m-%d')) for e in employees_to_fetch}
+        try:
+             # Llama a tu función de conexión a la DB
+             horarios_periodo = {e: obtener_horario_empleado_completo(e, start_date.strftime('%Y-%m-%d')) for e in employees_to_fetch}
+        except NameError:
+             # Si el import de db_postgres_connection falla, usa un diccionario vacío
+             horarios_periodo = {}
         
         for idx, row in df.iterrows():
             horario_emp = horarios_periodo.get(row['employee'])
             if not horario_emp or horario_emp.get('dias_con_horario', 0) == 0: continue
             
-            # ¡¡ELIMINAMOS LA LÍNEA QUE ASIGNABA LA SUCURSAL!!
-            # La columna 'Sucursal' que ya está en el 'row' (la del device_id) es la que se respeta.
-            # df.at[idx, 'Sucursal'] = horario_emp.get('sucursal', 'N/A') # <-- ESTA LÍNEA SE ELIMINA O COMENTA
-
             dia_nombre = DIAS_ESPANOL.get(row['dia_semana'], "")
             dia_horario = horario_emp.get('horarios_detallados', {}).get(dia_nombre, {})
             
@@ -447,7 +398,6 @@ class AttendanceProcessor:
                 df.at[idx, 'horario_entrada'] = dia_horario.get('entrada')
                 df.at[idx, 'horario_salida'] = dia_horario.get('salida')
         return df
-    # --- FIN CORRECCIÓN 3 ---
 
     def aplicar_permisos_detallados(self, df: pd.DataFrame, permisos_dict: dict) -> pd.DataFrame:
         df['horas_permiso'] = pd.Timedelta(0); df['tiene_permiso'] = False
@@ -480,7 +430,6 @@ class AttendanceProcessor:
                     if row['checado_ultimo'] < umbral: df.at[idx, 'salida_anticipada'] = 1
         return df
 
-    # --- INICIA CORRECCIÓN 4: calcular_resumen_final (Arreglo 'col not exist') ---
     def calcular_resumen_final(self, df: pd.DataFrame) -> pd.DataFrame:
         if df.empty: return pd.DataFrame()
         
@@ -488,26 +437,17 @@ class AttendanceProcessor:
         df['falta_justificada'] = df.apply(lambda x: 1 if x['tiene_permiso'] and x['horas_permiso'] == x['horas_esperadas'] else 0, axis=1)
         df['episodio_ausencia_diario'] = df['falta'] 
 
-        # 1. Quitamos 'Sucursal' del agg_dict
         agg_dict = {
-            'Nombre': 'first', 
-            # 'Sucursal': 'first', # <-- SE QUITA DE AQUÍ
-            'duration': 'sum', 'horas_esperadas': 'sum',
+            'Nombre': 'first', 'duration': 'sum', 'horas_esperadas': 'sum',
             'horas_permiso': 'sum', 'horas_descanso': 'sum', 'falta': 'sum', 'retardo': 'sum', 'salida_anticipada': 'sum',
             'falta_justificada': 'sum', 'episodio_ausencia_diario': 'sum',
         }
         
-        # 2. Agregamos 'Sucursal' al GROUPBY
-        # Esto crea un resumen por Empleado Y POR Sucursal
         df_resumen = df.groupby(['employee', 'Sucursal']).agg(agg_dict).reset_index().rename(columns={
-            'duration': 'total_horas_trabajadas_td', 
-            'horas_esperadas': 'total_horas_esperadas_td', # <-- Esta es la columna que agrupa
-            'horas_permiso': 'total_horas_descontadas_permiso_td', 
-            'horas_descanso': 'total_horas_descanso_td',
-            'falta': 'faltas_del_periodo', 
-            'retardo': 'total_retardos', 
-            'salida_anticipada': 'total_salidas_anticipadas', 
-            'falta_justificada': 'faltas_justificadas', 
+            'duration': 'total_horas_trabajadas_td', 'horas_esperadas': 'total_horas_esperadas_td',
+            'horas_permiso': 'total_horas_descontadas_permiso_td', 'horas_descanso': 'total_horas_descanso_td',
+            'falta': 'faltas_del_periodo', 'retardo': 'total_retardos', 
+            'salida_anticipada': 'total_salidas_anticipadas', 'falta_justificada': 'faltas_justificadas', 
             'episodio_ausencia_diario': 'episodios_ausencia',
         })
         
@@ -526,11 +466,7 @@ class AttendanceProcessor:
                            'total_horas_descontadas_permiso', 'total_horas_descanso', 'total_horas',
                            'diferencia_HHMMSS', 'total_faltas', 'total_retardos', 'total_salidas_anticipadas',
                            'faltas_del_periodo', 'faltas_justificadas', 'episodios_ausencia',
-                           # Columnas TD invisibles para cálculos posteriores
-                           'total_horas_trabajadas_td', 
-                           'total_horas_esperadas_td', # <-- ESTA ES LA COLUMNA QUE FALTABA
-                           'total_horas_td']]
-    # --- FIN CORRECCIÓN 4 ---
+                           'total_horas_trabajadas_td', 'total_horas_esperadas_td','total_horas_td']]
 
 
     def calcular_descanso_real_detallado(self, df_checadas_completo: pd.DataFrame) -> pd.DataFrame:
@@ -550,9 +486,7 @@ class AttendanceProcessor:
                     entrada_descanso = checadas_ordenadas[i+1]
                     total_descanso_dia += (entrada_descanso - salida_descanso)
             
-            descansos_calculados.append({
-                'employee': empleado, 'dia': dia, 'horas_descanso': total_descanso_dia
-            })
+            descansos_calculados.append({'employee': empleado, 'dia': dia, 'horas_descanso': total_descanso_dia})
         return pd.DataFrame(descansos_calculados)
 
     def procesar_reporte_completo(self, checkin_data, permisos_dict, start_date, end_date, employee_codes=None):
@@ -582,8 +516,7 @@ class AttendanceProcessor:
         return df_detalle, df_resumen
 
     def pivot_checkins(self, df_checadas: pd.DataFrame) -> pd.DataFrame:
-        if df_checadas.empty or 'time' not in df_checadas.columns:
-            return pd.DataFrame()
+        if df_checadas.empty or 'time' not in df_checadas.columns: return pd.DataFrame()
         
         df = df_checadas.copy()
         df['checado_time'] = pd.to_datetime(df['time']).dt.time
@@ -604,11 +537,8 @@ class AttendanceProcessor:
         entry_schedule = pd.to_datetime(df_copy['horario_entrada'].astype(str), errors='coerce', format='%H:%M:%S')
 
         conditions = [
-            df_copy['falta'] == 1,
-            (first_check - entry_schedule).dt.total_seconds() > (30 * 60), 
-            df_copy['salida_anticipada'] == 1,
-            df_copy['retardo'] == 1,       
-            df_copy['tiene_permiso'] == True, 
+            df_copy['falta'] == 1, (first_check - entry_schedule).dt.total_seconds() > (30 * 60), 
+            df_copy['salida_anticipada'] == 1, df_copy['retardo'] == 1, df_copy['tiene_permiso'] == True, 
             (df_copy['horas_esperadas'].dt.total_seconds() == 0) & (df_copy['checados_count'] == 0), 
             (df_copy['retardo'] == 1) & (df_copy['duration'] >= df_copy['horas_esperadas']), 
         ]
@@ -641,8 +571,7 @@ class AttendanceProcessor:
         df_detalle = self.determinar_observaciones(df_detalle)
 
         for col in ['duration', 'horas_esperadas']:
-            if col in df_detalle.columns:
-                df_detalle[col] = df_detalle[col].apply(td_to_str)
+            if col in df_detalle.columns: df_detalle[col] = df_detalle[col].apply(td_to_str)
         
         for col in df_detalle.columns:
             if col.startswith('checado_') or col.startswith('horario_'):
@@ -653,45 +582,29 @@ class AttendanceProcessor:
         df_detalle.fillna('-', inplace=True)
         return df_detalle
 
-# --- FUNCIONES PARA GRÁFICA GENERAL (MODIFICADAS) ---
+# --- FUNCIONES PARA GRÁFICA GENERAL (USAN PANDAS) ---
 
-# --- INICIA CORRECCIÓN 5: calcular_metricas_adicionales ---
 def calcular_metricas_adicionales(df_resumen: pd.DataFrame, df_detalle: pd.DataFrame) -> pd.DataFrame:
-    """
-    Combina la robustez de la versión original con los NUEVOS cálculos de SIC del compañero.
-    Asegura el renombrado a ESPAÑOL al final.
-    """
     columnas_finales = ['ID', 'Nombre', 'Faltas', 'Puntualidad (%)', 'Eficiencia (%)',
                         'SIC', 'Sucursal', 'dias_laborables', 'Tasa Ausentismo (%)', 'Índice Puntualidad (%)', 'Eficiencia Horas (%)',
                         'Faltas Justificadas'] 
     df_resumen_final_vacio = pd.DataFrame(columns=columnas_finales)
 
-    if df_resumen is None or df_detalle is None or df_resumen.empty or df_detalle.empty:
-        print("[WARN] df_resumen o df_detalle es None o vacío.")
-        return df_resumen_final_vacio
+    if df_resumen is None or df_detalle is None or df_resumen.empty or df_detalle.empty: return df_resumen_final_vacio
 
-    # 'Sucursal' también es necesaria en df_detalle para el groupby de dias_laborables
     required_cols_resumen = ['employee', 'total_horas_trabajadas_td', 'total_horas_td',
                              'total_retardos', 'faltas_del_periodo', 'episodios_ausencia',
                              'total_salidas_anticipadas', 'faltas_justificadas',
                              'Sucursal', 'Nombre']
     required_cols_detalle = ['employee', 'horas_esperadas', 'Sucursal'] 
     
-    # 1. Validación de columnas (versión más estricta/segura)
     missing_resumen_cols = [col for col in required_cols_resumen if col not in df_resumen.columns]
     missing_detalle_cols = [col for col in required_cols_detalle if col not in df_detalle.columns]
 
-    if missing_resumen_cols:
-        print(f"[WARN] Faltan columnas en df_resumen: {missing_resumen_cols}. Retornando vacío.")
-        return df_resumen_final_vacio
-    if missing_detalle_cols:
-         print(f"[WARN] Faltan columnas en df_detalle: {missing_detalle_cols}. Retornando vacío.")
-         return df_resumen_final_vacio
+    if missing_resumen_cols or missing_detalle_cols: return df_resumen_final_vacio
     
-    df_resumen_calc = df_resumen.copy()
-    df_detalle_calc = df_detalle.copy()
+    df_resumen_calc = df_resumen.copy(); df_detalle_calc = df_detalle.copy()
 
-    # Asegurar tipos de datos antes del cálculo
     df_resumen_calc['total_horas_trabajadas_td'] = pd.to_timedelta(df_resumen_calc['total_horas_trabajadas_td'], errors='coerce').fillna(pd.Timedelta(0))
     df_resumen_calc['total_horas_td'] = pd.to_timedelta(df_resumen_calc['total_horas_td'], errors='coerce').fillna(pd.Timedelta(0))
     df_resumen_calc['total_retardos'] = pd.to_numeric(df_resumen_calc['total_retardos'], errors='coerce').fillna(0)
@@ -702,22 +615,18 @@ def calcular_metricas_adicionales(df_resumen: pd.DataFrame, df_detalle: pd.DataF
     if not pd.api.types.is_timedelta64_dtype(df_detalle_calc['horas_esperadas']):
         df_detalle_calc['horas_esperadas'] = pd.to_timedelta(df_detalle_calc['horas_esperadas'], errors='coerce').fillna(pd.Timedelta(0))
 
-    # 2. Contar días laborables (Agrupando por Empleado Y Sucursal)
     dias_laborables = df_detalle_calc[df_detalle_calc['horas_esperadas'].dt.total_seconds() > 0].groupby(['employee', 'Sucursal']).size()
     dias_laborables.name = 'dias_laborables'
     
-    # Asegurar que los tipos coinciden para el merge
     df_resumen_calc['employee'] = df_resumen_calc['employee'].astype(str)
     df_resumen_calc['Sucursal'] = df_resumen_calc['Sucursal'].astype(str)
     dias_laborables.index = dias_laborables.index.set_levels([dias_laborables.index.levels[0].astype(str), dias_laborables.index.levels[1].astype(str)])
 
-    # Hacer merge usando AMBAS claves
     df_resumen_calc = df_resumen_calc.merge(dias_laborables, on=['employee', 'Sucursal'], how='left')
 
     df_resumen_calc['dias_laborables'] = df_resumen_calc['dias_laborables'].fillna(0).astype(int)
-    mask_dlp = df_resumen_calc['dias_laborables'] > 0 # Máscara para días laborables > 0
+    mask_dlp = df_resumen_calc['dias_laborables'] > 0
 
-    # --- 3. Calcular Eficiencia (efficiency / Eficiencia Horas (%)) ---
     total_horas_trabajadas_s = df_resumen_calc['total_horas_trabajadas_td'].dt.total_seconds()
     total_horas_netas_s = df_resumen_calc['total_horas_td'].dt.total_seconds()
     df_resumen_calc['efficiency'] = 100.0
@@ -727,9 +636,8 @@ def calcular_metricas_adicionales(df_resumen: pd.DataFrame, df_detalle: pd.DataF
             total_horas_trabajadas_s[mask_hnp], total_horas_netas_s[mask_hnp],
             out=np.full_like(total_horas_trabajadas_s[mask_hnp], 100.0), where=total_horas_netas_s[mask_hnp]!=0
         ) * 100
-    df_resumen_calc['efficiency'] = df_resumen_calc['efficiency'].fillna(100) #.clip(0, 150)
+    df_resumen_calc['efficiency'] = df_resumen_calc['efficiency'].fillna(100)
 
-    # --- 4. Calcular Puntualidad (punctuality / Índice Puntualidad (%)) ---
     df_resumen_calc['punctuality'] = 100.0
     if mask_dlp.any():
         denom = df_resumen_calc.loc[mask_dlp, 'dias_laborables'].astype(float)
@@ -737,11 +645,9 @@ def calcular_metricas_adicionales(df_resumen: pd.DataFrame, df_detalle: pd.DataF
         df_resumen_calc.loc[mask_dlp, 'punctuality'] = np.divide(numer.clip(lower=0), denom, out=np.full_like(numer, 100.0), where=denom!=0) * 100
     df_resumen_calc['punctuality'] = df_resumen_calc['punctuality'].fillna(100).clip(0, 100)
 
-    # --- 5. Calcular SIC (NUEVO CÁLCULO del compañero) ---
     df_resumen_calc['sic'] = 100.0
     if mask_dlp.any():
         denom = df_resumen_calc.loc[mask_dlp, 'dias_laborables'].astype(float)
-        
         faltas = df_resumen_calc.loc[mask_dlp, 'faltas_del_periodo']
         retardos = df_resumen_calc.loc[mask_dlp, 'total_retardos']
         salidas = df_resumen_calc.loc[mask_dlp, 'total_salidas_anticipadas']
@@ -752,7 +658,6 @@ def calcular_metricas_adicionales(df_resumen: pd.DataFrame, df_detalle: pd.DataF
     
     df_resumen_calc['sic'] = df_resumen_calc['sic'].fillna(100).clip(0, 100)
 
-    # --- 6. Tasa de Ausentismo (Métrica nueva para el front) ---
     df_resumen_calc['tasa_ausentismo'] = 0.0
     if mask_dlp.any():
         denom = df_resumen_calc.loc[mask_dlp, 'dias_laborables'].astype(float)
@@ -762,81 +667,51 @@ def calcular_metricas_adicionales(df_resumen: pd.DataFrame, df_detalle: pd.DataF
     
     df_resumen_calc['productivity'] = df_resumen_calc['efficiency']
 
-    # --- 7. Redondeo y Renombrado (para la compatibilidad con tu código) ---
     for col in ['efficiency', 'punctuality', 'sic', 'productivity', 'tasa_ausentismo']:
-         if col in df_resumen_calc.columns: df_resumen_calc[col] = df_resumen_calc[col].round(1)
+          if col in df_resumen_calc.columns: df_resumen_calc[col] = df_resumen_calc[col].round(1)
 
     rename_map = {
-         'employee': 'ID', 
-         'Nombre': 'Nombre', 
-         'faltas_del_periodo': 'Faltas',
-         'tasa_ausentismo': 'Tasa Ausentismo (%)', # Nueva
-         'punctuality': 'Puntualidad (%)', 
-         'efficiency': 'Eficiencia (%)',
-         'punctuality': 'Índice Puntualidad (%)', # El que usa la tabla de KPIs
-         'efficiency': 'Eficiencia Horas (%)', # El que usa la tabla de KPIs
-         'sic': 'SIC', 
-         'Sucursal': 'Sucursal', 
-         'dias_laborables': 'dias_laborables',
-         'total_retardos': 'Retardos',
-         'faltas_justificadas': 'Faltas Justificadas',
+          'employee': 'ID', 'Nombre': 'Nombre', 'faltas_del_periodo': 'Faltas',
+          'tasa_ausentismo': 'Tasa Ausentismo (%)', 'punctuality': 'Puntualidad (%)', 
+          'efficiency': 'Eficiencia (%)', 'punctuality': 'Índice Puntualidad (%)',
+          'efficiency': 'Eficiencia Horas (%)', 'sic': 'SIC', 'Sucursal': 'Sucursal', 
+          'dias_laborables': 'dias_laborables', 'total_retardos': 'Retardos',
+          'faltas_justificadas': 'Faltas Justificadas',
     }
     
-    # Aplicamos el renombramiento
     cols_to_rename = {k: v for k, v in rename_map.items() if k in df_resumen_calc.columns}
     df_resumen_final = df_resumen_calc.rename(columns=cols_to_rename)
     
-    # Asegurar que todas las columnas finales existan, si no, crear con valor por defecto
     for col in columnas_finales:
         if col not in df_resumen_final.columns:
             if col in ['Faltas', 'dias_laborables', 'Faltas Justificadas']: df_resumen_final[col] = 0
             elif col in ['Puntualidad (%)', 'Eficiencia (%)', 'SIC', 'Tasa Ausentismo (%)', 'Índice Puntualidad (%)', 'Eficiencia Horas (%)']: df_resumen_final[col] = 0.0
             else: df_resumen_final[col] = 'N/A'
 
-    # Seleccionar y retornar las columnas necesarias para el front (Tablas y Gráficas)
     return df_resumen_final[list(set(df_resumen_final.columns).intersection(set(columnas_finales)))]
-# --- FIN CORRECCIÓN 5 ---
 
 
-# --- INICIA CORRECCIÓN 6 (Arreglo 73 empleados): agregar_datos_dashboard_por_sucursal ---
 def agregar_datos_dashboard_por_sucursal(df_metricas: pd.DataFrame) -> List[Dict]:
-    """
-    Agrupa el DataFrame con métricas por sucursal y calcula los KPIs para el dashboard.
-    Acepta los nombres de columna en ESPAÑOL generados por la función anterior.
-    """
-    col_id = 'ID'
-    col_eficiencia = 'Eficiencia Horas (%)' # Usamos el nombre en español del KPI
-    col_puntualidad = 'Índice Puntualidad (%)' # Usamos el nombre en español del KPI
-    col_sic = 'SIC'
-    col_faltas_injustificadas = 'Faltas' # Faltas del periodo (injustificadas)
-    col_faltas_justificadas = 'Faltas Justificadas' # Añadida por el compañero
+    col_id = 'ID'; col_eficiencia = 'Eficiencia Horas (%)'; col_puntualidad = 'Índice Puntualidad (%)'
+    col_sic = 'SIC'; col_faltas_injustificadas = 'Faltas'; col_faltas_justificadas = 'Faltas Justificadas'
     col_sucursal = 'Sucursal'
 
     required_cols_for_grouping = [col_id, col_eficiencia, col_puntualidad, col_sic, col_faltas_injustificadas, col_sucursal, col_faltas_justificadas]
     
     if df_metricas is None or df_metricas.empty or not all(col in df_metricas.columns for col in required_cols_for_grouping):
-        # Muestra una advertencia si faltan columnas
-        missing = [col for col in required_cols_for_grouping if col not in (df_metricas.columns if df_metricas is not None else [])]
-        print(f"[WARN] Faltan columnas en df_metricas para agrupar: {missing}. Retornando lista vacía.")
         return []
 
     df_sucursales = df_metricas.groupby(col_sucursal).agg(
-        # CAMBIO CLAVE: Contar empleados ÚNICOS, no filas.
-        employees=(col_id, 'nunique'),
-        efficiency=(col_eficiencia, 'mean'),
-        punctuality=(col_puntualidad, 'mean'),
-        avgSIC=(col_sic, 'mean'),
-        absences=(col_faltas_injustificadas, 'sum'), # Faltas Injustificadas
-        total_justified_absences=(col_faltas_justificadas, 'sum') # NUEVO KPI
+        employees=(col_id, 'nunique'), efficiency=(col_eficiencia, 'mean'),
+        punctuality=(col_puntualidad, 'mean'), avgSIC=(col_sic, 'mean'),
+        absences=(col_faltas_injustificadas, 'sum'), total_justified_absences=(col_faltas_justificadas, 'sum')
     ).reset_index()
 
     df_sucursales.rename(columns={col_sucursal: 'name'}, inplace=True)
-    df_sucursales['productivity'] = df_sucursales['efficiency'] # Se asume proxy
+    df_sucursales['productivity'] = df_sucursales['efficiency']
 
-    # Redondeo final para los KPIs
     for col in ['efficiency', 'punctuality', 'avgSIC', 'productivity']:
-        if col in df_sucursales.columns:
-            df_sucursales[col] = df_sucursales[col].round(1) # Redondeo a 1 decimal
+        if col in df_sucursales.columns: df_sucursales[col] = df_sucursales[col].round(1)
 
     df_sucursales['employees'] = df_sucursales['employees'].astype(int)
     df_sucursales['absences'] = df_sucursales['absences'].astype(int)
@@ -844,19 +719,10 @@ def agregar_datos_dashboard_por_sucursal(df_metricas: pd.DataFrame) -> List[Dict
 
     return df_sucursales.to_dict('records')
 
-    # --- PEGA EL NUEVO CÓDIGO AQUÍ ---
-
 def actualizar_datos_basicos_empleado_service(empleado_id, data):
-    """
-    Actualiza solo los campos básicos de Empleado (nombre, códigos, email).
-    """
-    from django.shortcuts import get_object_or_404 # Asegúrate de que este import esté al inicio del archivo
+    """Actualiza los datos personales básicos de un empleado activo."""
+    empleado = get_object_or_404(Empleado.objects, pk=empleado_id) # Usa objects para buscar activo
     
-    # 1. Encontrar al empleado
-    empleado = get_object_or_404(Empleado, pk=empleado_id)
-    
-    # 2. Actualizar datos (usando los IDs del formulario 1)
-    # Nota: Los campos aquí deben coincidir con los "name" del formulario HTML
     empleado.codigo_frappe = data.get("codigoFrappeEdit")
     empleado.codigo_checador = data.get("codigoChecadorEdit")
     empleado.nombre = data.get("nombreEdit")
@@ -864,52 +730,32 @@ def actualizar_datos_basicos_empleado_service(empleado_id, data):
     empleado.apellido_materno = data.get("segundoApellidoEdit")
     empleado.email = data.get("emailEdit")
     
-    # 3. Guardar y retornar
     empleado.save()
     return empleado
 
-# Abre core/services.py y añade esta función (o renombra la antigua)
-
 def actualizar_horarios_empleado_service(empleado_id, data):
-    """
-    Función de Formulario 2: Borra y re-crea horarios, sin tocar datos personales.
-    """
-    from django.shortcuts import get_object_or_404
-    from .models import Empleado, AsignacionHorario, Horario
+    """Borra y recrea las asignaciones de horario para un empleado activo."""
     from django.core.exceptions import ValidationError
-
+    
     try:
-        # 1. Encontrar al empleado
-        empleado = get_object_or_404(Empleado, pk=empleado_id)
+        empleado = get_object_or_404(Empleado.objects, pk=empleado_id) # Usa objects para buscar activo
 
-        # 2. BORRAR TODOS sus horarios antiguos
         AsignacionHorario.objects.filter(empleado=empleado).delete()
         
-        # 3. Re-crear los horarios enviados (lógica de tu JS)
-        sucursales = data.getlist("sucursales[]")
-        horarios = data.getlist("horarios[]")
-        dias = data.getlist("dias[]")
+        sucursales = data.getlist("sucursales[]"); horarios = data.getlist("horarios[]"); dias = data.getlist("dias[]")
+        if not sucursales: return empleado 
 
-        if not sucursales:
-            # Si no hay nuevos horarios (botón Guardar Horarios presionado sin etiquetas)
-            return empleado 
-
-        # Si hay nuevos horarios, los creamos
         for sucursal_id, horario_id, dias_str in zip(sucursales, horarios, dias):
             dias_list = dias_str.split(",")
             for dia in dias_list:
                 horario_obj = Horario.objects.get(pk=int(horario_id))
                 AsignacionHorario.objects.create(
-                    empleado=empleado,
-                    sucursal_id=int(sucursal_id),
-                    horario=horario_obj,
-                    dia_especifico_id=int(dia),
-                    hora_entrada_especifica=horario_obj.hora_entrada,
+                    empleado=empleado, sucursal_id=int(sucursal_id), horario=horario_obj,
+                    dia_especifico_id=int(dia), hora_entrada_especifica=horario_obj.hora_entrada,
                     hora_salida_especifica=horario_obj.hora_salida,
                     hora_salida_especifica_cruza_medianoche=horario_obj.cruza_medianoche,
                 )
         return empleado
 
     except Exception as e:
-        # Aquí puedes manejar errores específicos si Horario.DoesNotExist, pero re-lanzaremos el error.
         raise ValidationError(f"Error al guardar horarios: {e}")

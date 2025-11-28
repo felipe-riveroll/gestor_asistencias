@@ -46,4 +46,9 @@ urlpatterns = [
     # 🟢 RUTA AÑADIDA PARA EXPORTAR EL EXCEL DE LA LISTA DE EMPLEADOS 🟢
     path("admin-gestion-empleados/exportar/excel/", views.exportar_lista_empleados_excel, name="exportar_lista_empleados_excel"),
     # ----------------------------------------------------
+    # Rutas de Soft Delete (Asegúrate de que 'eliminar-empleado' ya exista)
+    path('empleados/eliminar/<int:empleado_id>/', views.eliminar_empleado, name='eliminar-empleado'),
+    
+    # 💥 RUTA NUEVA QUE FALTA 💥
+    path('empleados/restaurar/<int:empleado_id>/', views.restaurar_empleado, name='restaurar-empleado'),
 ]

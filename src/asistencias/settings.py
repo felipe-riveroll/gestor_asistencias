@@ -78,11 +78,20 @@ import os
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.getenv('POSTGRES_DB'),
-        'USER': os.getenv('POSTGRES_USER'),
-        'PASSWORD': os.getenv('POSTGRES_PASSWORD'),
-        'HOST': os.getenv('DB_HOST'),
-        'PORT': os.getenv('DB_PORT'),
+        # Intenta leer del .env (Docker), si no hay nada, usa 'postgres' (Local)
+        'NAME': os.getenv('POSTGRES_DB', 'postgres'),
+        
+        # Intenta leer del .env, si no, usa 'postgres'
+        'USER': os.getenv('POSTGRES_USER', 'postgres'),
+        
+        # Intenta leer del .env, si no, usa tu contraseña local 'asiatech'
+        'PASSWORD': os.getenv('POSTGRES_PASSWORD', 'asiatech'),
+        
+        # ESTA ES LA CLAVE: Docker usa 'db', Local usa 'localhost'
+        'HOST': os.getenv('DB_HOST', 'localhost'),
+        
+        # Docker usa 5432, Local usa 5433
+        'PORT': os.getenv('DB_PORT', '5433'),
     }
 }
 
@@ -136,9 +145,9 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
-EMAIL_HOST = "smtp.gmail.com"
-EMAIL_PORT = 587
+EMAIL_HOST = "smtp.purelymail.com"
+EMAIL_PORT = 465
 EMAIL_USE_TLS = True
-EMAIL_HOST_USER = "loremar32ket60@gmail.com" #MODIFICAR POR CORREO DE LA EMPRESA Y CON VARIABLES DE ENTORNO
-EMAIL_HOST_PASSWORD = " " #MODIFICAR POR CORREO DE LA EMPRESA Y CON VARIABLES DE ENTORNO
+EMAIL_HOST_USER = "asistencias@asiatech.com.mx" #MODIFICAR POR CORREO DE LA EMPRESA Y CON VARIABLES DE ENTORNO
+EMAIL_HOST_PASSWORD = "ufwyyrttvezcubxmtwqg" #MODIFICAR POR CORREO DE LA EMPRESA Y CON VARIABLES DE ENTORNO
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER

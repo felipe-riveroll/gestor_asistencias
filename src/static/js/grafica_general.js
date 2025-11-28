@@ -1,10 +1,12 @@
 // Variables globales
 let charts = {};
-let currentData = null; // Guardará toda la data: { branches: [], period_summary: {}, employee_summary_kpis: [], employee_performance_kpis: [] }
+let currentData = null; // Guarda toda la data: { branches: [], period_summary: {}, employee_summary_kpis: [], employee_performance_kpis: [] }
 let activeTab = 'summary'; // Pestaña activa por defecto ('summary' o 'kpis')
 
 // --- INICIALIZACIÓN ---
 document.addEventListener('DOMContentLoaded', () => {
+    // Nota: Es mejor definir las variables CSS de color directamente en el CSS
+    // para que getComputedStyle funcione correctamente.
     initializeDashboard();
     loadInitialData(); // Carga los datos iniciales al abrir la página
 });
@@ -46,6 +48,7 @@ function initializeDashboard() {
 }
 
 function applyFiltersAutomatically() {
+    // Detiene el timeout anterior y crea uno nuevo para evitar múltiples llamadas rápidas
     clearTimeout(window.filterTimeout);
     window.filterTimeout = setTimeout(loadInitialData, 300);
 }
@@ -57,11 +60,17 @@ function handleDateRangeChange() {
         customDatesWrapper.style.display = 'flex';
     } else {
         customDatesWrapper.style.display = 'none';
+        
+        // Calcular y aplicar el rango si no es personalizado
+        const dates = calculateDateRange(range);
+        document.getElementById('startDate').value = dates.startDate; 
+        document.getElementById('endDate').value = dates.endDate;
+        
         applyFiltersAutomatically();
     }
 }
 
-// --- CARGA DE DATOS (Corregida) ---
+// --- CARGA DE DATOS ---
 async function loadInitialData() {
     showLoadingState();
     try {
@@ -109,22 +118,21 @@ function calculateDateRange(range) {
             endDate = new Date();
             break;
         case 'month':
-            // --- CORRECCIÓN LÓGICA ---
-            // "Este Mes" (del 1ro a hoy), basado en el comentario de initializeDashboard
+            // "Este Mes" (del 1ro a hoy)
             startDate = new Date(today.getFullYear(), today.getMonth(), 1);
             endDate = new Date(today);
             break;
         case 'quarter':
             const quarter = Math.floor(today.getMonth() / 3);
             startDate = new Date(today.getFullYear(), quarter * 3, 1);
-            endDate = new Date(today.getFullYear(), quarter * 3 + 3, 0);
+            // El último día del trimestre (Mes 3, 6, 9, 12)
+            endDate = new Date(today.getFullYear(), quarter * 3 + 3, 0); 
             break;
         case 'year':
             startDate = new Date(today.getFullYear(), 0, 1);
             endDate = new Date(today.getFullYear(), 11, 31);
             break;
         default:
-            // Default (igual a 'month' corregido)
             startDate = new Date(today.getFullYear(), today.getMonth(), 1);
             endDate = new Date(today);
     }
@@ -139,42 +147,28 @@ function calculateDateRange(range) {
     return { startDate: formatDate(startDate), endDate: formatDate(endDate) };
 }
 
-// --- LLAMADA A LA API (Corregida) ---
+// --- LLAMADA A LA API ---
 async function fetchDashboardData(startDate, endDate) {
-    // --- CORRECCIÓN (Sintaxis) ---
-    console.log(`Cargando datos del Dashboard General de ${startDate} a ${endDate} desde la API...`);
-    
-    // --- CORRECCIÓN (Sintaxis) ---
     const apiUrl = `/api/dashboard/general/?startDate=${startDate}&endDate=${endDate}`;
 
     try {
         const response = await fetch(apiUrl);
         if (!response.ok) {
-            // --- CORRECCIÓN (Sintaxis) ---
             let errorMessage = `Error ${response.status}: ${response.statusText}`;
             try {
                 const errorData = await response.json();
                 errorMessage = errorData.error || errorMessage;
             } catch (e) { /* Ignora */ }
-            console.error('Error en la respuesta de la API:', errorMessage);
             throw new Error(errorMessage);
         }
         const result = await response.json();
         if (!result.success) {
-            console.error('La API reportó un error:', result.error);
             throw new Error(result.error || 'Error desconocido reportado por la API');
         }
-        console.log("Datos recibidos de la API:", result.data);
+        
         const defaultData = {
-            branches: [],
-            period_summary: {
-                total_attendances: 0,
-                total_permissions: 0,
-                total_absences: 0,
-                total_justified_absences: 0
-            },
-            employee_summary_kpis: [],
-            employee_performance_kpis: []
+            branches: [], period_summary: { total_attendances: 0, total_permissions: 0, total_absences: 0, total_justified_absences: 0 },
+            employee_summary_kpis: [], employee_performance_kpis: []
         };
         const receivedData = result.data || {};
 
@@ -185,7 +179,6 @@ async function fetchDashboardData(startDate, endDate) {
              employee_performance_kpis: receivedData.employee_performance_kpis || []
         };
     } catch (error) {
-        console.error('Falló la llamada a fetchDashboardData:', error);
         throw error;
     }
 }
@@ -199,12 +192,12 @@ function updateDashboard(data) {
 
     updateMainKPIs(data);
     updateAllCharts(data);
-    updateBranchesTable(data); // Llama a la función que dibuja la tabla de sucursales
+    updateBranchesTable(data);
     handleSearch();
 }
 
 function updateMainKPIs(data) {
-    // --- FILTRO: Excluir "Rio Blanco" del KPI de "Total Empleados" ---
+    // FILTRO: Excluir "Rio Blanco" del cálculo principal de KPI (si es necesario)
     const branches = (data?.branches || []).filter(b => b.name && b.name.toLowerCase() !== 'rio blanco');
     
     const totalEmployees = branches.reduce((sum, b) => sum + (b?.employees || 0), 0);
@@ -213,27 +206,24 @@ function updateMainKPIs(data) {
     const totalAbsences = data?.period_summary?.total_absences || 0;
     
     document.getElementById('totalEmployees').textContent = totalEmployees.toLocaleString();
-    // --- CORRECCIÓN (Sintaxis) ---
     document.getElementById('avgEfficiency').textContent = `${avgEfficiency.toFixed(1)}%`;
-    // --- CORRECCIÓN (Sintaxis) ---
     document.getElementById('avgPunctuality').textContent = `${avgPunctuality.toFixed(1)}%`;
     document.getElementById('totalAbsences').textContent = totalAbsences.toLocaleString();
 }
 
-// --- FUNCIÓN DE TABLA DE SUCURSALES (ACTUALIZADA) ---
+// --- FUNCIÓN DE TABLA DE SUCURSALES ---
 function updateBranchesTable(data) {
-    const tbody = document.getElementById('summaryTableBody'); // Usa el ID de tu HTML 'grafica_general.html'
-    if (!tbody) {
-        console.warn("No se encontró el elemento 'summaryTableBody'.");
-        return; 
-    }
+    const tbody = document.getElementById('summaryTableBody');
+    if (!tbody) return; 
     
     tbody.innerHTML = '';
-    // --- FILTRO: Excluir "Rio Blanco" de la tabla ---
-    const branches = (data?.branches || []).filter(b => b.name && b.name.toLowerCase() !== 'rio blanco');
+    // FILTRO: Excluir "Rio Blanco" y "Sin Asignar" de la tabla de resumen de sucursales
+    const branches = (data?.branches || []).filter(b => 
+        b.name && b.name.toLowerCase() !== 'rio blanco' && b.name !== 'Sin Asignar'
+    );
 
     if (branches.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">No hay datos de sucursales.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">No hay datos de sucursales activas.</td></tr>';
         return;
     }
 
@@ -243,6 +233,13 @@ function updateBranchesTable(data) {
     let sumAvgSic = 0;
     let totalAbsences = 0;
     
+    // Obtener colores del CSS (Asumiendo que has definido las variables --success-color, etc.)
+    const getColorClass = (value, minGood, minWarning) => {
+        if (value >= minGood) return 'kpi-cell-success';
+        if (value >= minWarning) return 'kpi-cell-warning';
+        return 'kpi-cell-danger';
+    };
+
     branches.forEach(branch => {
         totalEmployees += branch.employees || 0;
         sumEfficiency += branch.efficiency || 0;
@@ -250,11 +247,11 @@ function updateBranchesTable(data) {
         sumAvgSic += branch.avgSIC || 0;
         totalAbsences += branch.absences || 0;
 
-        // Lógica de color de JS (Corregida)
-        const efficiencyClass = (branch.efficiency >= 85) ? 'kpi-cell-success' : (branch.efficiency >= 50) ? 'kpi-cell-warning' : 'kpi-cell-danger';
-        const punctualityClass = (branch.punctuality >= 95) ? 'kpi-cell-success' : (branch.punctuality >= 70) ? 'kpi-cell-warning' : 'kpi-cell-danger';
-        const sicClass = (branch.avgSIC >= 85) ? 'kpi-cell-success' : (branch.avgSIC >= 50) ? 'kpi-cell-warning' : 'kpi-cell-danger';
-
+        // Nota: Las clases kpi-cell-X deben estar definidas en tu CSS para dar color.
+        const efficiencyClass = getColorClass(branch.efficiency, 85, 50);
+        const punctualityClass = getColorClass(branch.punctuality, 95, 70);
+        const sicClass = getColorClass(branch.avgSIC, 85, 50);
+        
         tbody.innerHTML += `
             <tr>
                 <td>${branch.name || 'N/A'}</td>
@@ -267,7 +264,6 @@ function updateBranchesTable(data) {
         `;
     });
 
-    // Añade la fila de totales/promedios
     const avgEfficiency = branches.length > 0 ? (sumEfficiency / branches.length).toFixed(1) : '0.0';
     const avgPunctuality = branches.length > 0 ? (sumPunctuality / branches.length).toFixed(1) : '0.0';
     const avgSic = branches.length > 0 ? (sumAvgSic / branches.length).toFixed(1) : '0.0';
@@ -284,6 +280,7 @@ function updateBranchesTable(data) {
     `;
 }
 
+// --- FUNCIÓN DE BÚSQUEDA ---
 function updateEmployeeSummaryTable() {
     const tbody = document.getElementById('employeeSummaryTableBody');
     const searchInput = document.getElementById('employeeSearchInput');
@@ -296,14 +293,13 @@ function updateEmployeeSummaryTable() {
     if (searchTerm) {
         employeeData = employeeData.filter(emp => {
             const idMatch = String(emp.ID || '').toLowerCase().includes(searchTerm);
-            const nameMatch = String(emp.Empleado || '').toLowerCase().includes(searchTerm);
+            const nameMatch = String(emp.Nombre || '').toLowerCase().includes(searchTerm);
             return idMatch || nameMatch;
         });
     }
 
     if (employeeData.length === 0) {
         const message = searchTerm ? 'No se encontraron empleados.' : 'No hay datos de resumen.';
-        // --- CORRECCIÓN (Sintaxis) ---
         tbody.innerHTML = `<tr><td colspan="${colspanValue}" style="text-align:center;">${message}</td></tr>`;
         return;
     }
@@ -318,7 +314,7 @@ function updateEmployeeSummaryTable() {
         tbody.innerHTML += `
             <tr>
                 <td>${emp.ID || 'N/A'}</td>
-                <td>${emp.Empleado || 'Sin Nombre'}</td>
+                <td>${emp.Nombre || 'Sin Nombre'}</td>
                 <td>${hrsTrab}</td>
                 <td>${hrsPlan}</td>
                 <td>${variacion}</td>
@@ -328,14 +324,13 @@ function updateEmployeeSummaryTable() {
     });
 }
 
-// --- FUNCIÓN DE TABLA KPI (Corregida) ---
 function updateEmployeeKPITable() {
     const tbody = document.getElementById('employeeKpiTableBody');
     const searchInput = document.getElementById('employeeSearchInput');
     const searchTerm = searchInput.value.toLowerCase().trim();
     tbody.innerHTML = '';
     
-    const colspanValue = 7; // ID, Nombre, Faltas Just, TasaAus, Punt, Efic, SIC
+    const colspanValue = 7;
 
     let employeeData = currentData?.employee_performance_kpis || [];
 
@@ -349,7 +344,6 @@ function updateEmployeeKPITable() {
 
     if (employeeData.length === 0) {
         const message = searchTerm ? 'No se encontraron empleados.' : 'No hay datos de KPIs.';
-        // --- CORRECCIÓN (Sintaxis) ---
         tbody.innerHTML = `<tr><td colspan="${colspanValue}" style="text-align:center;">${message}</td></tr>`;
         return;
     }
@@ -358,23 +352,16 @@ function updateEmployeeKPITable() {
         if (value === null || value === undefined || isNaN(value)) return ''; 
         
         switch (kpiType) { 
-            case 'faltas_just': // Lógica: 0-5=Verde, 6-10=Amarillo, >10=Rojo
+            case 'faltas_just': 
                 return value <= 5 ? 'kpi-cell-success' : value <= 10 ? 'kpi-cell-warning' : 'kpi-cell-danger'; 
-            
             case 'ausentismo': 
-                // --- CORRECCIÓN LÓGICA ---
-                // Tasa de ausentismo (al revés): <5% (verde), <10% (amarillo), >=10% (rojo)
                 return value <= 5 ? 'kpi-cell-success' : value < 10 ? 'kpi-cell-warning' : 'kpi-cell-danger'; 
-            
-            case 'puntualidad': // >=95 (Verde), >=70 (Amarillo), <70 (Rojo)
+            case 'puntualidad': 
                 return value >= 95 ? 'kpi-cell-success' : value >= 70 ? 'kpi-cell-warning' : 'kpi-cell-danger'; 
-            
-            case 'eficiencia': // >=85 (Verde), >=50 (Amarillo), <50 (Rojo)
+            case 'eficiencia': 
                 return value >= 85 ? 'kpi-cell-success' : value >= 50 ? 'kpi-cell-warning' : 'kpi-cell-danger'; 
-            
-            case 'sic': // >=85 (Verde), >=50 (Amarillo), <50 (Rojo)
+            case 'sic': 
                 return value >= 85 ? 'kpi-cell-success' : value >= 50 ? 'kpi-cell-warning' : 'kpi-cell-danger'; 
-            
             default: 
                 return ''; 
         } 
@@ -411,7 +398,6 @@ function updateEmployeeKPITable() {
             </tr>`;
     });
 }
-// --- FIN DE LA ACTUALIZACIÓN ---
 
 function handleSearch() {
     if (activeTab === 'summary') {
@@ -431,7 +417,6 @@ function showLoadingState() {
 
 function showNoData() {
     const noDataMsgElement = document.getElementById('noDataMessage');
-    // --- CORRECCIÓN (Sintaxis) ---
     noDataMsgElement.innerHTML = `
         <i class="fa-solid fa-info-circle" style="font-size: 50px; margin-bottom: 20px; color: var(--info-color);"></i>
         <h2>No hay datos disponibles</h2>
@@ -441,17 +426,13 @@ function showNoData() {
     document.getElementById('dashboardContent').style.display = 'block';
     document.getElementById('exportExcelBtn').disabled = true;
     
-    // Asegurarse de que las tablas existan antes de limpiarlas
     const summaryTableBody = document.getElementById('summaryTableBody');
-    // --- CORRECCIÓN (Sintaxis) ---
     if (summaryTableBody) summaryTableBody.innerHTML = `<tr><td colspan="6" style="text-align:center;">No hay datos.</td></tr>`;
     
     const employeeSummaryTableBody = document.getElementById('employeeSummaryTableBody');
-    // --- CORRECCIÓN (Sintaxis) ---
     if (employeeSummaryTableBody) employeeSummaryTableBody.innerHTML = `<tr><td colspan="7" style="text-align:center;">No hay datos.</td></tr>`;
     
     const employeeKpiTableBody = document.getElementById('employeeKpiTableBody');
-    // --- CORRECCIÓN (Sintaxis) ---
     if (employeeKpiTableBody) employeeKpiTableBody.innerHTML = `<tr><td colspan="7" style="text-align:center;">No hay datos.</td></tr>`;
     
     Object.values(charts).forEach(chart => {
@@ -463,7 +444,6 @@ function showNoData() {
 
 function showErrorState(title, message) {
     const noData = document.getElementById('noDataMessage');
-    // --- CORRECCIÓN (Sintaxis) ---
     noData.innerHTML = `
         <i class="fa-solid fa-exclamation-triangle" style="font-size: 50px; margin-bottom: 20px; color: var(--danger-color);"></i>
         <h2>${title}</h2>
@@ -518,26 +498,28 @@ function initializeCharts() {
     });
 }
 
-// --- FUNCIÓN DE GRÁFICAS (ACTUALIZADA) ---
+// --- FUNCIÓN DE GRÁFICAS (ACTUALIZADA Y CORREGIDA) ---
 function updateAllCharts(data) {
-    // --- FILTRO: Excluir "Rio Blanco" ---
     const allBranches = data?.branches || [];
-    const branches = allBranches.filter(b => b.name && b.name.toLowerCase() !== 'rio blanco');
+    
+    // 💥 FILTRADO CRUCIAL: Excluir 'Rio Blanco' y 'Sin Asignar' 💥
+    const branches = allBranches.filter(b => 
+        (b.name && b.name.toLowerCase() !== 'rio blanco') && 
+        (b.name !== 'Sin Asignar') 
+    );
     
     const summary = data?.period_summary || {
-        total_attendances: 0,
-        total_permissions: 0,
-        total_absences: 0,
-        total_justified_absences: 0
+        total_attendances: 0, total_permissions: 0, total_absences: 0, total_justified_absences: 0
     };
+    // Obtener color del CSS
     const color = (variable) => getComputedStyle(document.documentElement).getPropertyValue(variable).trim();
 
-    // --- Gráfica 1: Eficiencia por Sucursal (Corregida) ---
+    // --- Gráfica 1: Eficiencia por Sucursal (Usando 'branches' filtrado) ---
     charts.branchEfficiencyChart.data = {
         labels: branches.map(b => b.name || 'N/A'),
         datasets: [{
             data: branches.map(b => b.efficiency || 0),
-            backgroundColor: branches.map(b => { // Colores dinámicos por valor
+            backgroundColor: branches.map(b => { 
                 const efficiency = b.efficiency || 0;
                 if (efficiency >= 85) return color('--success-color');
                 if (efficiency >= 50) return color('--warning-color');
@@ -546,20 +528,17 @@ function updateAllCharts(data) {
         }]
     };
 
-    // --- Gráfica 2: Distribución de SIC (Corregida) ---
+    // --- Gráfica 2: Distribución de SIC ---
     const sicRanges = {
-        'Excelente (>=85)': 0,
-        'Bueno (70-84)': 0,
-        'Regular (50-69)': 0,
-        'Crítico (<50)': 0
+        'Excelente (>=85)': 0, 'Bueno (70-84)': 0, 'Regular (50-69)': 0, 'Crítico (<50)': 0
     };
 
     const kpiData = currentData?.employee_performance_kpis || [];
     kpiData.forEach(emp => {
         const sic = emp.SIC || 0;
         if (sic >= 85) sicRanges['Excelente (>=85)']++;
-        else if (sic >= 70) sicRanges['Bueno (70-84)']++; // Rango ajustado
-        else if (sic >= 50) sicRanges['Regular (50-69)']++; // Rango ajustado
+        else if (sic >= 70) sicRanges['Bueno (70-84)']++;
+        else if (sic >= 50) sicRanges['Regular (50-69)']++;
         else sicRanges['Crítico (<50)']++;
     });
 
@@ -567,37 +546,24 @@ function updateAllCharts(data) {
         labels: Object.keys(sicRanges),
         datasets: [{
             data: Object.values(sicRanges),
-            backgroundColor: [
-                color('--success-color'), // Excelente
-                color('--info-color'),     // Bueno
-                color('--warning-color'), // Regular
-                color('--danger-color')   // Crítico
-            ]
+            backgroundColor: [color('--success-color'), color('--info-color'), color('--warning-color'), color('--danger-color')]
         }]
     };
-    // FIN DE LA GRÁFICA SIC AJUSTADA
 
     // --- Gráfica 3: Eventos del Periodo ---
     charts.periodEventsChart.data = {
         labels: ['Asistencias', 'Permisos', 'Faltas', 'F. Justificadas'],
         datasets: [{
             data: [
-                summary.total_attendances || 0,
-                summary.total_permissions || 0,
-                summary.total_absences || 0,
-                summary.total_justified_absences || 0
+                summary.total_attendances || 0, summary.total_permissions || 0, 
+                summary.total_absences || 0, summary.total_justified_absences || 0
             ],
-            backgroundColor: [
-                color('--success-color'),
-                color('--info-color'),
-                color('--danger-color'),
-                color('--warning-color')
-            ]
+            backgroundColor: [color('--success-color'), color('--info-color'), color('--danger-color'), color('--warning-color')]
         }]
     };
     charts.periodEventsChart.options.scales.y.title.text = 'Total Ocurrencias';
 
-    // --- Gráfica 4: Top Empleados por Eficiencia (Corregida) ---
+    // --- Gráfica 4: Top Empleados por Eficiencia ---
     const topEmployees = [...kpiData].sort((a, b) => (b['Eficiencia Horas (%)'] || 0) - (a['Eficiencia Horas (%)'] || 0)).slice(0, 10);
     const efficiencyColors = topEmployees.map(emp => {
         const eficiencia = emp['Eficiencia Horas (%)'] || 0;
@@ -610,33 +576,26 @@ function updateAllCharts(data) {
         labels: topEmployees.map(b => b.Nombre || 'N/A'),
         datasets: [{
             data: topEmployees.map(b => b['Eficiencia Horas (%)'] || 0),
-            backgroundColor: efficiencyColors // Colores dinámicos
+            backgroundColor: efficiencyColors
         }]
     };
 
-    // --- Gráfica 5: Comparativa (Radar) (Corregida) ---
+    // --- Gráfica 5: Comparativa (Radar) ---
     const radarLabels = ['Eficiencia', 'Puntualidad', 'SIC', 'Productividad'];
-    
-    // Paleta de colores para el radar
     const dynamicColors = [
-        'rgba(133, 30, 35, 0.6)',   // Rojo Oscuro (Principal)
-        'rgba(59, 130, 246, 0.6)',  // Azul (Info)
-        'rgba(22, 163, 74, 0.6)',   // Verde (Success)
-        'rgba(245, 158, 11, 0.6)',  // Naranja (Warning)
-        'rgba(155, 89, 182, 0.6)',  // Morado
+        'rgba(133, 30, 35, 0.6)', 'rgba(59, 130, 246, 0.6)', 'rgba(22, 163, 74, 0.6)', 
+        'rgba(245, 158, 11, 0.6)', 'rgba(155, 89, 182, 0.6)',
     ];
 
     charts.branchComparisonChart.data = {
         labels: radarLabels,
-        // Usar las sucursales ya filtradas (sin Rio Blanco)
-        datasets: branches.map((b, i) => {
-            const datasetColor = dynamicColors[i % dynamicColors.length]; // Asigna un color del array
+        datasets: branches.map((b, i) => { // Usamos 'branches' filtrado
+            const datasetColor = dynamicColors[i % dynamicColors.length];
             const borderColor = datasetColor.replace('0.6', '1'); 
             
             return {
-                // --- CORRECCIÓN (Sintaxis) ---
                 label: b.name || `Sucursal ${i+1}`,
-                data: [b.efficiency || 0, b.punctuality || 0, b.avgSIC || 0, b.productivity || 0], // 'productivity' viene del backend
+                data: [b.efficiency || 0, b.punctuality || 0, b.avgSIC || 0, b.productivity || 0],
                 backgroundColor: datasetColor,
                 borderColor: borderColor,
                 borderWidth: 2
@@ -649,6 +608,7 @@ function updateAllCharts(data) {
 
 
 // --- EXPORTACIÓN A EXCEL (LLAMA AL BACKEND CON POST) ---
+// (Mantenemos tu función original de exportación)
 async function exportToExcelWithStyles() {
     if (!currentData || (!currentData.branches?.length && !currentData.employee_summary_kpis?.length && !currentData.employee_performance_kpis?.length)) {
         alert('No hay datos cargados para exportar.');
@@ -661,8 +621,7 @@ async function exportToExcelWithStyles() {
 
     const startDate = document.getElementById('startDate').value;
     const endDate = document.getElementById('endDate').value;
-    // --- CORRECCIÓN (Sintaxis) ---
-    const filename = `Dashboard_General_Analisis_${startDate}_a_${endDate}.xlsx`; // Nombre de archivo actualizado
+    const filename = `Dashboard_General_Analisis_${startDate}_a_${endDate}.xlsx`;
 
     try {
         const response = await fetch('/api/export_dashboard_excel/', {
@@ -675,7 +634,6 @@ async function exportToExcelWithStyles() {
         });
 
         if (!response.ok) {
-            // --- CORRECCIÓN (Sintaxis) ---
             let errorMsg = `Error ${response.status}`;
             try {
                 const errorData = await response.json();
