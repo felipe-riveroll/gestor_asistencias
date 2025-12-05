@@ -466,10 +466,15 @@ function pintarTablaRetardos(datos) {
         const doc = new jsPDF({ orientation: 'landscape' });
         
         const colorMap = {
-            'fila-falta': [255, 204, 204], 'fila-retardo-normal': [255, 242, 204],
-            'fila-permiso': [212, 237, 218], 'fila-retardo-cumplido': [230, 212, 237],
-            'fila-descanso': [155, 89, 182], 'fila-retardo-mayor': [255, 217, 102],
-            'fila-salida-anticipada': [248, 203, 173],
+            'fila-retardo-normal': [255, 255, 0],   // Amarillo #FFFF00
+            'fila-falta':          [255, 0, 0],     // Rojo #FF0000
+            'fila-retardo-mayor':  [255, 0, 0],     // Rojo
+            'fila-permiso':        [146, 208, 80],  // Verde #92D050
+            'fila-txt-extra':      [0, 176, 240],   // Azul #00B0F0
+            'fila-tomo-txt':       [56, 87, 35],    // Verde Oscuro #385723
+            'fila-descanso':       [112, 48, 160],  // Morado #7030A0
+            'fila-festivo':        [66, 0, 125],    // Violeta #42007D
+            'fila-totales':        [221, 235, 247]  // Gris Azulado #DDEBF7
         };
 
         doc.autoTable({

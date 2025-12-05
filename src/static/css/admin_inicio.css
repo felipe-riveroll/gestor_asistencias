@@ -395,3 +395,164 @@ tr:hover {
     justify-content: center;
   }
 }
+
+/* =======================================================
+   1. ESTRUCTURA PRINCIPAL (Esto arregla la posición)
+   ======================================================= */
+
+/* El fondo oscuro que cubre toda la pantalla */
+.modal {
+    display: none;        /* Oculto por defecto */
+    position: fixed;      /* Fijo en la pantalla */
+    z-index: 1050;        /* Por encima de todo */
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;     /* Evita scroll en el fondo */
+    background-color: rgba(0, 0, 0, 0.6); /* Negro con transparencia */
+}
+
+/* La caja blanca del modal (Aquí ocurre el centrado) */
+.modal-content {
+    background-color: #fefefe;
+    position: absolute;   /* Permite posicionamiento libre */
+    top: 50%;             /* Baja al 50% de la pantalla */
+    left: 50%;            /* Se mueve al 50% del ancho */
+    transform: translate(-50%, -50%); /* SE CENTRA EXACTAMENTE */
+    
+    width: 90%;           /* Ancho responsivo */
+    max-width: 450px;     /* Ancho máximo en PC */
+    border-radius: 8px;   /* Bordes redondeados */
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3); /* Sombra elegante */
+    border: none;         /* Sin bordes extra */
+    padding: 0;           /* Padding 0 para que el header toque el borde */
+}
+
+/* =======================================================
+   2. ESTILOS INTERNOS (Tu diseño visual)
+   ======================================================= */
+
+/* Encabezado Rojo */
+.modal-header {
+    background-color: #851E23; /* Tu color rojo institucional */
+    padding: 15px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-radius: 8px 8px 0 0; /* Redondeado solo arriba */
+}
+
+.modal-header h3 {
+    margin: 0;
+    font-size: 18px;
+    color: #ffffff !important;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.modal-header h3 i {
+    color: #ffffff !important;
+}
+
+/* Botón de cerrar (X) */
+.close-modal { 
+    color: #ffffff !important; 
+    cursor: pointer; 
+    font-size: 24px; 
+    background: none; 
+    border: none;
+    opacity: 0.8;
+    transition: opacity 0.3s;
+}
+
+.close-modal:hover { 
+    opacity: 1; 
+}
+
+/* Cuerpo del modal */
+.modal-body-custom { 
+    padding: 20px 25px; 
+}
+
+/* Grupos de inputs */
+.input-group { 
+    margin-bottom: 15px; 
+}
+
+.input-group label { 
+    display: block; 
+    margin-bottom: 8px; 
+    font-weight: bold; 
+    color: #333; 
+    font-size: 14px;
+}
+
+/* Estilo para los inputs de texto y contraseña */
+.input-group input {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    box-sizing: border-box; /* Asegura que el padding no rompa el ancho */
+}
+
+/* =======================================================
+   3. EXTRA: ESTILO PARA EL OJITO DE CONTRASEÑA
+   (Vi que tienes la estructura en tu HTML, esto lo acomoda)
+   ======================================================= */
+.password-container {
+    position: relative; /* Para poder poner el ojito encima */
+}
+
+.password-container input {
+    padding-right: 40px; /* Espacio a la derecha para que el texto no toque el ojo */
+}
+
+.password-toggle {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%); /* Centra el icono verticalmente */
+    cursor: pointer;
+    color: #666;
+}
+
+.password-toggle:hover {
+    color: #333;
+}
+
+/* =======================================================
+   4. PIE DEL MODAL (Botones)
+   ======================================================= */
+.modal-footer {
+    padding: 15px 20px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    background-color: #f8f9fa; /* Gris muy clarito */
+    border-radius: 0 0 8px 8px; /* Redondeado solo abajo */
+    border-top: 1px solid #eee;
+}
+
+/* Estilos básicos para botones si no los tienes globales */
+.btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.btn-secondary {
+    background-color: #6c757d;
+    color: white;
+}
+
+.btn-primary {
+    background-color: #851E23;
+    color: white;
+}

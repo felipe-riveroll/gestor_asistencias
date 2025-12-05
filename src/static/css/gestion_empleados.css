@@ -1,3 +1,6 @@
+/* =======================================================
+   1. ESTILOS BASE Y RESET
+   ======================================================= */
 * {
     margin: 0;
     padding: 0;
@@ -6,18 +9,18 @@
 }
 
 body {
-    /* El body solo maneja el degradado de fondo y ocupa todo el viewport */
     background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
     color: #000001;
     line-height: 1.6;
 }
 
-/* 💥 CORRECCIÓN ESTRUCTURAL: Contenedor Raíz con CSS Grid 💥 */
+/* =======================================================
+   2. LAYOUT PRINCIPAL (CSS GRID)
+   ======================================================= */
 .container-root {
     display: grid;
-    /* Define 3 áreas: Navbar, Sidebar, Content */
-    grid-template-columns: 250px 1fr; /* 250px para Sidebar, 1fr para Contenido */
-    grid-template-rows: 70px 1fr; /* 70px para Navbar, 1fr para el resto */
+    grid-template-columns: 250px 1fr;
+    grid-template-rows: 70px 1fr;
     grid-template-areas: 
         "navbar navbar"
         "sidebar content";
@@ -25,58 +28,51 @@ body {
     min-height: 100vh;
 }
 
-/* --- BARRA SUPERIOR Y LATERAL --- */
-
+/* Navbar Superior */
 .top-navbar {
-    /* 💥 Posicionamiento en el área de Grid 💥 */
     grid-area: navbar;
-    
     background-color: #851E23; 
     color: white;
     display: flex;
     align-items: center;
     padding: 0 20px;
-    z-index: 1000; /* Asegura que esté al frente */
+    z-index: 1000;
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
 }
 
+/* Sidebar Lateral */
 .sidebar {
-    /* 💥 Posicionamiento en el área de Grid 💥 */
     grid-area: sidebar;
-    
     width: 250px; 
-    background-color: #000001; /* Fondo del menú lateral */
+    background-color: #000001;
     color: #ffffff;
-    padding-top: 20px; /* Ya no necesita padding-top: 70px porque el grid lo maneja */
+    padding-top: 20px;
     z-index: 900;
 }
 
-/* 💥 CORRECCIÓN ESTRUCTURAL: Contenedor del Contenido Principal 💥 */
+/* Wrapper del Contenido */
 .content-wrapper {
-    /* 💥 Posicionamiento en el área de Grid 💥 */
     grid-area: content;
-    
     width: 100%;
-    padding: 20px; /* Padding para separar del borde del viewport */
-    background-color: transparent; /* El degradado del body se verá aquí */
-    overflow-y: auto; /* Permite scroll solo en el contenido */
+    padding: 20px;
+    background-color: transparent;
+    overflow-y: auto;
 }
 
-/* --- CONTENEDOR PRINCIPAL (donde va la tabla, ahora con fondo blanco) --- */
-
+/* Contenedor Blanco Central */
 .main-container {
-    max-width: 1120px; /* Mantenemos tu ancho máximo deseado */
-    margin: 0 auto; /* Centra el contenido dentro del content-wrapper */
+    max-width: 1120px;
+    margin: 0 auto;
     padding: 20px;
-    background: white; /* ⬅️ FONDO BLANCO APLICADO AQUÍ */
+    background: white;
     border-radius: 12px;
     box-shadow: 0 4px 20px #5f5f64;
-    min-height: 80vh; /* Para visualización */
+    min-height: 80vh;
 }
 
-/* El resto de estilos (h1, .header, .search-container, .table-container, .modal, etc.) se mantienen igual, 
-  ya que definen los elementos DENTRO del .main-container. */
-  
+/* =======================================================
+   3. COMPONENTES INTERNOS (Header, Buscador, Tablas)
+   ======================================================= */
 .header {
     display: flex;
     align-items: center;
@@ -145,7 +141,7 @@ h1 {
     font-size: 18px;
 }
 
-
+/* --- TABLAS --- */
 .table-container {
     background: #ffffff;
     border-radius: 12px;
@@ -175,7 +171,6 @@ th {
     top: 0;
 }
 
-/* --- ESTILO: Fila de Empleado Eliminado Lógicamente --- */
 .deleted-row {
     background-color: #fce8e8;
     color: #721c24;
@@ -194,64 +189,10 @@ th {
 tr:hover {
     background: #fff5f5;
 }
-/*modificado*/
-.modal {
-    display: none;
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.5);
-    z-index: 1000;
-    justify-content: center;
-    align-items: center;
-    backdrop-filter: blur(3px);
-}
 
-#scheduleModal {
-    z-index: 1001;
-}
-
-.modal-content {
-    background: white;
-    padding: 30px;
-    border-radius: 12px;
-    width: 90%;
-    max-width: 800px;
-    max-height: 90vh;
-    overflow-y: auto;
-    position: relative;
-    animation: modalFadeIn 0.3s ease-out;
-    border: 2px solid #851E23;
-}
-
-@keyframes modalFadeIn {
-    from {
-        opacity: 0;
-        transform: translateY(-20px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-.close {
-    position: absolute;
-    top: 20px;
-    right: 20px;
-    font-size: 26px;
-    cursor: pointer;
-    color: #851E23;
-    transition: all 0.2s;
-}
-
-.close:hover {
-    color: #851E23;
-    transform: rotate(90deg);
-}
-
+/* =======================================================
+   4. FORMULARIOS Y BOTONES
+   ======================================================= */
 .form-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -300,6 +241,7 @@ tr:hover {
     margin-top: 30px;
 }
 
+/* Botones */
 .btn {
     padding: 12px 24px;
     border: none;
@@ -314,46 +256,18 @@ tr:hover {
     transition: all 0.3s;
 }
 
-.btn i {
-    font-size: 16px;
-    transition: transform 0.3s;
-}
+.btn i { font-size: 16px; transition: transform 0.3s; }
+.btn:hover i { transform: translateX(3px); }
 
-.btn:hover i {
-    transform: translateX(3px);
-}
+.btn-success { background: linear-gradient(135deg, #27ae60, #27ae60); color: white; }
+.btn-success:hover { background: linear-gradient(#188a49, #188a49); transform: translateY(-2px); }
 
-.btn-success {
-    background: linear-gradient(135deg, #27ae60, #27ae60);
-    color: white;
-}
+.btn-danger { background: linear-gradient(#e74c3c, #e74c3c); color: white; }
+.btn-danger:hover { background: linear-gradient(135deg, #851E23, #851E23); transform: translateY(-2px); }
 
-.btn-success:hover {
-    background: linear-gradient(#188a49, #188a49);
-    transform: translateY(-2px);
-}
+.btn-cancel { background: #851E23; color: #ffffff; }
+.btn-cancel:hover { background: #851E23; transform: translateY(-2px); }
 
-.btn-danger {
-    background: linear-gradient(#e74c3c, #e74c3c);
-    color: white;
-}
-
-.btn-danger:hover {
-    background: linear-gradient(135deg, #851E23, #851E23);
-    transform: translateY(-2px);
-}
-
-.btn-cancel {
-    background: #851E23;
-    color: #ffffff;
-}
-
-.btn-cancel:hover {
-    background: #851E23;
-    transform: translateY(-2px);
-}
-
-/* --- Botón de Restauración --- */
 .btn-warning {
     background: linear-gradient(135deg, #ffc107, #ffc107);
     color: #343a40;
@@ -370,17 +284,11 @@ tr:hover {
     transition: all 0.3s;
     pointer-events: auto;
 }
-
 .btn-warning:hover {
     background: linear-gradient(135deg, #e0a800, #e0a800);
     transform: translateY(-2px);
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
 }
-
-.btn-warning:hover i {
-    transform: none; 
-}
-
 
 .floating-btn {
     position: fixed;
@@ -399,11 +307,7 @@ tr:hover {
     transition: all 0.3s;
     z-index: 1000;
 }
-
-.floating-btn:hover {
-    transform: translateY(-5px) scale(1.05);
-    background: linear-gradient(#851E23);
-}
+.floating-btn:hover { transform: translateY(-5px) scale(1.05); background: linear-gradient(#851E23); }
 
 .btn-import {
     position: fixed;
@@ -422,13 +326,12 @@ tr:hover {
     color: white;
     box-shadow: 0 6px 15px #000001;
 }
+.btn-import:hover { transform: translateY(-5px) scale(1.05); background: linear-gradient(135deg, #000001); }
 
-.btn-import:hover {
-    transform: translateY(-5px) scale(1.05);
-    background: linear-gradient(135deg, #000001);
-}
 
-/* Schedule styles */
+/* =======================================================
+   5. OTROS (Horarios, Responsive, Alertas)
+   ======================================================= */
 .schedule-container {
     background-color: #ffffff;
     padding: 20px;
@@ -436,18 +339,8 @@ tr:hover {
     margin-bottom: 20px;
     border: 1px solid #000001;
 }
-
-.day-selector {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-    margin-bottom: 15px;
-}
-
-.day-checkbox {
-    display: none;
-}
-
+.day-selector { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 15px; }
+.day-checkbox { display: none; }
 .day-label {
     padding: 8px 15px;
     background-color: #e9ecef;
@@ -456,23 +349,9 @@ tr:hover {
     transition: all 0.3s;
     font-size: 14px;
 }
-
-.day-checkbox:checked + .day-label {
-    background-color: #851E23;
-    color: white;
-}
-
-.time-inputs {
-    display: flex;
-    gap: 15px;
-    align-items: flex-end;
-    margin-bottom: 15px;
-}
-
-.time-inputs .form-group {
-    flex: 1;
-    margin-bottom: 0;
-}
+.day-checkbox:checked + .day-label { background-color: #851E23; color: white; }
+.time-inputs { display: flex; gap: 15px; align-items: flex-end; margin-bottom: 15px; }
+.time-inputs .form-group { flex: 1; margin-bottom: 0; }
 
 .add-btn {
     background: linear-gradient(#851E23);
@@ -489,20 +368,9 @@ tr:hover {
     transition: all 0.3s;
     margin-bottom: 8px;
 }
+.add-btn:hover { background: linear-gradient(#851E23); transform: scale(1.1); }
 
-.add-btn:hover {
-    background: linear-gradient(#851E23);
-    transform: scale(1.1);
-}
-
-.schedule-labels {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-    margin-top: 15px;
-    min-height: 50px;
-}
-
+.schedule-labels { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 15px; min-height: 50px; }
 .schedule-label {
     background: linear-gradient(#000001);
     color: white;
@@ -513,32 +381,9 @@ tr:hover {
     gap: 8px;
     font-size: 14px;
 }
+.delete-btn { background: none; border: none; color: white; cursor: pointer; font-size: 14px; display: flex; align-items: center; justify-content: center; }
+.empty-schedule { color: #000001; font-style: italic; text-align: center; width: 100%; }
 
-.delete-btn {
-    background: none;
-    border: none;
-    color: white;
-    cursor: pointer;
-    font-size: 14px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.empty-schedule {
-    color: #000001;
-    font-style: italic;
-    text-align: center;
-    width: 100%;
-}
-
-/* Modal pequeño */
-.modal-content.small {
-    max-width: 400px;
-    z-index: 1002;
-}
-
-/* Nuevo estilo para la lista de administración vertical y con scroll */
 .admin-schedule-list {
     max-height: 150px; 
     overflow-y: auto; 
@@ -548,8 +393,6 @@ tr:hover {
     padding: 10px;
     margin-bottom: 20px;
 }
-
-/* Estilo para cada item de eliminación */
 .horario-flexible-item {
     display: flex; 
     justify-content: space-between;
@@ -574,83 +417,22 @@ tr:hover {
     display: flex;
     align-items: center;
     justify-content: center;
-    margin-left: 10px;
-    flex-shrink: 0;
 }
 
-/* Responsive */
 @media (max-width: 768px) {
-    .form-grid {
-        flex-direction: column;
-        align-items: stretch;
-        grid-template-columns: 1fr;
-        gap: 15px;
-    }
-    
-    .form-row {
-        flex-direction: column;
-        gap: 15px;
-    }
-    
-    .time-inputs {
-        flex-direction: column;
-        align-items: stretch;
-    }
-    
-    .floating-btn, .btn-import {
-        right: 20px;
-        bottom: 20px;
-    }
-    
-    .btn-import {
-        bottom: 80px;
-    }
-    
-    .header {
-        flex-direction: column;
-        text-align: center;
-    }
-    
-    h1 {
-        margin-right: 0;
-        margin-bottom: 15px;
-    }
-    
-    .form-actions {
-        flex-direction: column;
-    }
-    
-    /* Ajuste para móvil para que el menú no cubra todo */
+    .form-grid, .form-row, .time-inputs, .header, .form-actions { flex-direction: column; }
+    .floating-btn, .btn-import { right: 20px; bottom: 20px; }
+    .btn-import { bottom: 80px; }
+    h1 { margin-right: 0; margin-bottom: 15px; }
     .container-root {
         grid-template-columns: 1fr !important;
-        grid-template-rows: 70px auto 1fr !important; /* Navbar, Sidebar, Content */
-        grid-template-areas: 
-            "navbar"
-            "sidebar"
-            "content" !important;
+        grid-template-rows: 70px auto 1fr !important;
+        grid-template-areas: "navbar" "sidebar" "content" !important;
     }
-    
-    .sidebar {
-        position: relative; /* Ya no fijo */
-        width: 100%;
-        height: auto;
-        padding-top: 10px;
-    }
-    
-    .content-wrapper {
-        margin-left: 0; /* Quitar el desplazamiento lateral */
-        padding-top: 10px;
-    }
+    .sidebar { position: relative; width: 100%; height: auto; padding-top: 10px; }
+    .content-wrapper { margin-left: 0; padding-top: 10px; }
 }
 
-/* Animaciones adicionales */
-@keyframes pulse {
-    0% { transform: scale(1); }
-    50% { transform: scale(1.05); }
-    100% { transform: scale(1); }
-}
-
-/* --- Alertas --- */
 .alerta {
     padding: 15px;
     margin: 15px auto;
@@ -671,4 +453,183 @@ tr:hover {
 .alerta.warning i { color: #ffc107; }
 .alerta.info { background-color: #d1ecf1; border: 1px solid #bee5eb; color: #0c5460; }
 .alerta.info i { color: #17a2b8; }
-/*---------------------------------------------------------------------------------------------------------------------------*/
+
+
+/* =======================================================
+   6. MODALES: CONFIGURACIÓN GENERAL (Tablas, Horarios)
+   ======================================================= */
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.6);
+    z-index: 1050;
+    overflow: hidden;
+}
+
+/* Modal ESTÁNDAR (Grande con padding) */
+.modal-content {
+    background: white;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    
+    width: 90%;
+    max-width: 800px; /* Grande */
+    max-height: 90vh;
+    overflow-y: auto;
+    
+    padding: 30px; /* Padding interno visible */
+    border-radius: 12px;
+    border: 2px solid #851E23;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+    animation: modalFadeIn 0.3s ease-out;
+}
+
+@keyframes modalFadeIn {
+    from { opacity: 0; transform: translate(-50%, -60%); }
+    to { opacity: 1; transform: translate(-50%, -50%); }
+}
+
+.close {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    font-size: 26px;
+    cursor: pointer;
+    color: #851E23;
+    transition: all 0.2s;
+}
+
+/* =======================================================
+   7. MODAL DE PASSWORD (#passwordModal) - DISEÑO EXCLUSIVO
+   ======================================================= */
+#passwordModal {
+    z-index: 2000 !important;
+}
+
+/* Estructura: Sin padding para que el header toque los bordes */
+#passwordModal .modal-content {
+    max-width: 400px !important; /* Pequeño */
+    padding: 0 !important;       /* CLAVE: Esto quita el borde blanco */
+    border: none !important;
+    overflow: hidden !important; /* Para redondear esquinas del header */
+    border-radius: 8px !important;
+}
+
+/* Header Rojo */
+#passwordModal .modal-header {
+    background-color: #851E23 !important;
+    padding: 15px 20px !important;
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    border-bottom: none !important;
+    margin: 0 !important;
+}
+
+#passwordModal .modal-header h3 {
+    margin: 0 !important;
+    font-size: 16px !important;
+    font-weight: bold !important;
+    color: white !important;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+#passwordModal .modal-header h3 i { color: white !important; }
+
+/* Botón cerrar blanco */
+#passwordModal .close-modal {
+    background: transparent !important;
+    border: none !important;
+    color: white !important;
+    font-size: 20px !important;
+    cursor: pointer;
+    opacity: 0.8;
+}
+#passwordModal .close-modal:hover { opacity: 1; }
+
+/* Cuerpo interno */
+#passwordModal .modal-body-custom {
+    padding: 20px 25px !important;
+    background-color: #fff;
+}
+
+/* Inputs */
+#passwordModal label {
+    font-size: 13px;
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 5px;
+    display: block;
+}
+#passwordModal input {
+    border: 1px solid #ccc;
+    padding: 10px;
+    border-radius: 4px;
+}
+
+/* Footer gris */
+#passwordModal .modal-footer {
+    padding: 15px 25px !important;
+    background-color: #f8f9fa !important;
+    border-top: 1px solid #eee !important;
+    display: flex !important;
+    justify-content: flex-end !important;
+    gap: 10px !important;
+}
+
+/* Botones específicos */
+#passwordModal .btn-secondary { background-color: #6c757d !important; color: white !important; border: none; }
+#passwordModal .btn-primary { background-color: #851E23 !important; color: white !important; border: none; }
+
+/* Ojito */
+.password-container { position: relative; width: 100%; }
+.password-container input { padding-right: 35px; }
+.password-toggle {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #666;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+/* =========================================
+   1. FORZAR AL FRENTE (Z-Index Máximo)
+   ========================================= */
+#scheduleModal {
+    z-index: 2000 !important; /* Nivel muy alto para ganar a cualquier otro modal */
+}
+
+/* Asegurar que el fondo oscuro de este modal también suba (si se genera) */
+#scheduleModal + .modal-backdrop {
+    z-index: 1990 !important;
+}
+
+/* =========================================
+   2. ESTILO: UN POCO MÁS ANCHO
+   ========================================= */
+.modal-content.small {
+    max-width: 500px !important; /* Aumentado a 500px para más espacio */
+    width: 95%; /* Para que no se salga de la pantalla en celulares */
+    margin: auto;
+    padding: 20px 25px !important; /* Espacio interno cómodo */
+}
+
+/* Ajuste de los inputs de hora para aprovechar el nuevo ancho */
+#scheduleModal .form-row {
+    gap: 15px; /* Más espacio entre "Entrada" y "Salida" */
+}
+
+#scheduleModal h2 {
+    text-align: center;
+    margin-bottom: 20px;
+    font-size: 1.4rem;
+}

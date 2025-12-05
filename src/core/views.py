@@ -12,6 +12,7 @@ from django.http import JsonResponse, HttpResponse
 from django.db.models import Q # Para el filtro en exportar_lista_empleados_excel
 from django.utils.encoding import escape_uri_path # Para manejar nombres de archivo
 import traceback # Para un mejor manejo de errores en debug
+from django.contrib.auth import update_session_auth_hash
 
 #Import pdf y excel de admin
 from django.conf import settings
@@ -35,6 +36,8 @@ from .services import (
 )
 from .models import Sucursal, Horario, Empleado, AsignacionHorario, DiaSemana
 from .main import generar_reporte_completo, generar_reporte_detalle_completo, generar_datos_dashboard_general,generar_datos_dashboard_31pte,generar_datos_dashboard_villas,generar_datos_dashboard_nave
+from django.views.decorators.http import require_POST
+from django.views.decorators.csrf import csrf_protect
 # Asegurar la importación de Q si no se hace al inicio
 
 # =======================================================
@@ -152,7 +155,7 @@ def exportar_lista_empleados_excel(request):
         standard_font = Font(name='Calibri', size=11)
         
         # 1. ENCABEZADO (Azul Claro)
-        header_fill = PatternFill(start_color="5B9BD5", end_color="5B9BD5", fill_type="solid")
+        header_fill = PatternFill(start_color="8DB4E3", end_color="8DB4E3", fill_type="solid")
         header_font = Font(color="FFFFFF", bold=True, name='Calibri', size=11)
         
         thin_border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
@@ -464,10 +467,30 @@ def exportar_excel_con_colores(request):
         header_align = Alignment(horizontal='center', vertical='center')
         
         color_map = {
-            'fila-ok': '92D050', 'fila-retardo-normal': 'FFFF00', 'fila-falta': 'FF0000', 
-            'fila-descanso': 'B2A1C7', 'fila-permiso': 'FFC0CB', 'fila-retardo-mayor': 'FF9900',
-            'fila-salida-anticipada': 'E76F51', 'fila-retardo-cumplido': 'E6D4ED', 
-            'fila-totales': 'DDEBF7'
+            # Verde Claro (Permisos) - Imagen 4
+            'fila-permiso': '92D050',
+            
+            # Amarillo (Retardo Normal) - Imagen 2
+            'fila-retardo-normal': 'FFFF00',
+            
+            # Rojo (Falta / Retardo Mayor) - Imagen 2
+            'fila-falta': 'FF0000',
+            'fila-retardo-mayor': 'FF0000',
+            
+            # Morado (Descanso / Fin de semana) - Imagen 2
+            'fila-descanso': '7030A0',
+            
+            # Violeta Oscuro (Festivos) - Imagen 2
+            'fila-festivo': '42007D',
+            
+            # Azul Cyan (TxT generado / Dia Extra) - Imagen 2 y 3
+            'fila-txt-extra': '00B0F0',
+            
+            # Verde Oscuro (Tomo TxT) - Imagen 2
+            'fila-tomo-txt': '385723',
+            
+            # Gris (Totales o Turno Nocturno)
+            'fila-totales': 'DDEBF7' 
         }
 
         for sheet_name, sheet_content in sheets_data.items():
@@ -1002,5 +1025,35 @@ def api_eliminar_horario_flexible(request, horario_id):
         return JsonResponse({"error": "Horario no encontrado."}, status=404)
     except Exception as e:
         return JsonResponse({"error": f"Error al eliminar: {str(e)}"}, status=500)
+
+# En core/views.py
+
+@require_POST
+@csrf_protect
+def cambiar_password_usuario(request):
+    try:
+        data = json.loads(request.body)
+        new_password = data.get('newPassword')
+        confirm_password = data.get('confirmPassword')
+
+        if not new_password or not confirm_password:
+            return JsonResponse({'success': False, 'error': 'Faltan campos.'}, status=400)
+        
+        if new_password != confirm_password:
+            return JsonResponse({'success': False, 'error': 'Las contraseñas no coinciden.'}, status=400)
+
+        # Logica de cambio
+        user = request.user
+        user.set_password(new_password) # Encripta la nueva contraseña
+        user.save()                     # Guarda en la BD
+
+        # Mantiene la sesión viva
+        update_session_auth_hash(request, user)
+
+        # AQUÍ ESTÁ EL CAMBIO DE MENSAJE QUE PEDISTE:
+        return JsonResponse({'success': True, 'message': 'Contraseña actualizada con éxito'})
+
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
 
 

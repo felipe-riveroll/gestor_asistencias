@@ -320,40 +320,133 @@ tbody td:first-child {
 /* ======================================================= */
 /* ===== INICIO: COLORES DE FILAS DE REPORTE (NUEVO) ===== */
 /* ======================================================= */
-
-/* --- Colores de la leyenda --- */
-.fila-ok {
-    background-color: #92D050 !important; /* Verde Brillante (Checado Normal) */
-}
+/* Retardo Normal (08:06 - 08:20) -> AMARILLO */
 .fila-retardo-normal {
-    background-color: #FFFF00 !important; /* Amarillo Brillante (Retardo Normal) */
+    background-color: #FFFF00 !important;
+    color: black !important;
 }
-.fila-falta {
-    background-color: #FF0000 !important; /* Rojo Brillante (Falta) */
+
+/* Retardo con Descuento / Falta -> ROJO */
+.fila-falta, .fila-retardo-mayor {
+    background-color: #FF0000 !important;
+    color: white !important; /* Texto blanco para contraste */
 }
-.fila-descanso {
-    background-color: #B2A1C7 !important; /* Morado Pálido (Fines de Semana) */
-}
+
+/* Permisos (Médico, Vacaciones, Laboral) -> VERDE CLARO BRILLANTE */
 .fila-permiso {
-    background-color: #E2EFDA !important; /* Verde Pálido (Permiso) */
+    background-color: #92D050 !important;
+    color: black !important;
 }
 
-/* --- Colores que no están en la leyenda --- */
-.fila-retardo-mayor {
-    background-color: #FFD966 !important; /* Amarillo/Dorado pálido */
-}
-.fila-salida-anticipada {
-    background-color: #F8CBAD !important; /* Naranja pálido */
-}
-.fila-retardo-cumplido {
-    background-color: #E6D4ED !important; /* Morado pálido (diferente) */
+/* Generó TxT / Paga TxT / Día Extra -> AZUL CYAN */
+.fila-txt-extra {
+    background-color: #00B0F0 !important;
+    color: black !important;
 }
 
-/* --- Color de Fila de Totales --- */
+/* Tomó TxT -> VERDE OSCURO */
+.fila-tomo-txt {
+    background-color: #385723 !important;
+    color: white !important;
+}
+
+/* Descanso / Fin de Semana -> MORADO */
+.fila-descanso {
+    background-color: #7030A0 !important;
+    color: white !important;
+}
+
+/* Festivos -> VIOLETA OSCURO */
+.fila-festivo {
+    background-color: #42007D !important;
+    color: white !important;
+}
+
+/* Totales (Gris azulado claro) */
 .fila-totales {
-    background-color: #DDEBF7 !important; /* Un azul muy pálido */
-    gont-weight: bold;
+    background-color: #DDEBF7 !important;
+    font-weight: bold;
+    color: black !important;
+}
+
+/* OK / Asistencia Correcta -> Blanco */
+.fila-ok {
+    background-color: #ffffff !important;
+    color: black !important;
+}
+
+.no-data {
+    text-align: center;
+    font-style: italic;
     color: #000000;
+    padding: 40px 0;
+}
+
+/* ===== MODAL ===== */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 2000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background-color: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(3px);
+    align-items: center;
+    justify-content: center;
+}
+
+.modal.show { display: flex !important; }
+
+.modal-content {
+    background-color: #fff;
+    margin: auto;
+    border: none;
+    border-radius: 8px;
+    width: 90%;
+    max-width: 400px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+    position: relative;
+    overflow: hidden;
+}
+
+.modal-header {
+    background-color: #851E23;
+    color: white;
+    padding: 15px 25px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modal-body-custom { padding: 25px; }
+
+.input-group { margin-bottom: 20px; }
+.input-group label { display: block; margin-bottom: 8px; font-weight: 600; font-size: 13px; }
+.input-group input { width: 100%; padding: 10px; border: 2px solid #ddd; border-radius: 8px; }
+
+.modal-footer {
+    padding: 15px 25px;
+    background-color: #f8f9fa;
+    border-top: 1px solid #eee;
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+}
+
+/* Responsive */
+@media (max-width: 992px) {
+    .sidebar { width: 70px; }
+    .section-title, .menu-item span { display: none; }
+    .report-container { margin-left: 70px; }
+}
+
+@media (max-width: 768px) {
+    .content-wrapper { flex-direction: column; }
+    .sidebar { width: 100%; bottom: 0; top: auto; }
+    .report-container { margin-left: 0; margin-bottom: 60px; }
 }
 
 /* ======================================================= */
@@ -391,4 +484,195 @@ tbody td:first-child {
     .main-menu { display: flex; }
     .menu-item { flex: 1; text-align: center; }
     .report-container { margin-left: 0; margin-bottom: 60px; padding: 20px; }
+}
+
+/* =========================================================
+   ESTILOS COMPLETOS DEL MODAL (Corregido y Definitivo)
+   ========================================================= */
+
+/* 1. Fondo Oscuro (Overlay) y Centrado */
+.modal {
+    display: none; /* Se activa con JS */
+    position: fixed;
+    z-index: 2000; /* Por encima de todo */
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background-color: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(3px); /* Efecto moderno de desenfoque */
+    
+    /* Centrado Flexbox Perfecto */
+    display: none; /* Oculto por defecto, JS lo cambia a Flex */
+    align-items: center;
+    justify-content: center;
+}
+
+/* IMPORTANTE: JS debe poner 'display: flex' al abrir, no 'block' */
+.modal.show {
+    display: flex !important;
+}
+
+/* 2. Caja del Modal */
+.modal-content {
+    background-color: var(--card-bg);
+    margin: auto;
+    padding: 0; /* CERO padding para que el header toque los bordes */
+    border: none;
+    border-radius: var(--border-radius);
+    width: 90%;
+    max-width: 400px; /* Ancho compacto */
+    box-shadow: var(--shadow-lg);
+    position: relative;
+    animation: slideDown 0.3s ease-out;
+    overflow: hidden; /* Recorta las esquinas del header */
+}
+
+@keyframes slideDown {
+    from { transform: translateY(-30px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+/* 3. Encabezado (Rojo Institucional) */
+.modal-header {
+    background-color: var(--primary-color);
+    color: white;
+    padding: 15px 25px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--primary-light);
+}
+
+.modal-header h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    letter-spacing: 0.5px;
+}
+
+.close-modal {
+    color: white;
+    background: transparent;
+    border: none;
+    font-size: 20px;
+    cursor: pointer;
+    opacity: 0.8;
+    transition: opacity 0.2s;
+}
+
+.close-modal:hover {
+    opacity: 1;
+}
+
+/* 4. Cuerpo del Modal (Inputs) */
+.modal-body-custom {
+    padding: 25px; /* Aquí va el espacio interno */
+    background-color: var(--card-bg);
+}
+
+/* Inputs */
+.input-group {
+    margin-bottom: 20px;
+}
+
+.input-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--secondary-text);
+    text-transform: uppercase;
+}
+
+.input-group input {
+    width: 100%;
+    padding: 10px 14px;
+    border: 2px solid var(--border-color);
+    border-radius: 8px;
+    font-size: 14px;
+    background: var(--bg-main);
+    color: var(--dark-text);
+    transition: all 0.3s ease;
+}
+
+.input-group input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    background: var(--card-bg);
+    box-shadow: 0 0 0 3px rgba(133, 30, 35, 0.1);
+}
+
+/* Ojito de contraseña */
+.password-container {
+    position: relative;
+}
+
+.password-container input {
+    padding-right: 40px;
+}
+
+.password-toggle {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--secondary-text);
+    cursor: pointer;
+    font-size: 15px;
+    transition: color 0.2s;
+}
+
+.password-toggle:hover {
+    color: var(--primary-color);
+}
+
+/* 5. Pie del Modal y Botones SÓLIDOS */
+.modal-footer {
+    padding: 15px 25px;
+    background-color: var(--bg-main);
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+}
+
+/* Clase base para botones */
+.btn-modal {
+    padding: 10px 24px;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s ease;
+    box-shadow: var(--shadow);
+}
+
+/* Botón Cancelar: Gris Sólido */
+.btn-secondary {
+    background-color: #6c757d; /* Gris estándar */
+    color: white;
+}
+
+.btn-secondary:hover {
+    background-color: #5a6268;
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+}
+
+/* Botón Actualizar: Rojo Institucional */
+.btn-primary {
+    background-color: var(--primary-color);
+    color: white;
+}
+
+.btn-primary:hover {
+    background-color: var(--primary-light);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
 }

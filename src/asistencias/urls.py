@@ -51,4 +51,5 @@ urlpatterns = [
     
     # 💥 RUTA NUEVA QUE FALTA 💥
     path('empleados/restaurar/<int:empleado_id>/', views.restaurar_empleado, name='restaurar-empleado'),
+    path('api/cambiar-password/', views.cambiar_password_usuario, name='cambiar_password_usuario'),
 ]

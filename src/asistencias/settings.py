@@ -147,7 +147,22 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 EMAIL_HOST = "smtp.purelymail.com"
 EMAIL_PORT = 465
-EMAIL_USE_TLS = True
+EMAIL_USE_SSL = True   # <--- CAMBIA ESTO (Antes tenías USE_TLS)
+EMAIL_USE_TLS = False
 EMAIL_HOST_USER = "asistencias@asiatech.com.mx" #MODIFICAR POR CORREO DE LA EMPRESA Y CON VARIABLES DE ENTORNO
 EMAIL_HOST_PASSWORD = "ufwyyrttvezcubxmtwqg" #MODIFICAR POR CORREO DE LA EMPRESA Y CON VARIABLES DE ENTORNO
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
+
+ALLOWED_HOSTS = ["*"]  # Importante para Docker
+
+CSRF_TRUSTED_ORIGINS = [
+    "http://localhost",
+    "http://localhost:8000",
+    "http://127.0.0.1",
+    "http://127.0.0.1:8000",
+]
+
+# Corrección de rutas de Login
+LOGIN_URL = '/login/'
+LOGIN_REDIRECT_URL = '/'
+LOGOUT_REDIRECT_URL = '/login/'

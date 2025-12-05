@@ -119,7 +119,8 @@ function calculateDateRange(range) {
             break;
         case 'month':
             // "Este Mes" (del 1ro a hoy)
-            startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+            startDate = new Date(today);
+            startDate.setMonth(today.getMonth() - 1);
             endDate = new Date(today);
             break;
         case 'quarter':
@@ -133,7 +134,8 @@ function calculateDateRange(range) {
             endDate = new Date(today.getFullYear(), 11, 31);
             break;
         default:
-            startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+            startDate = new Date(today);
+            startDate.setMonth(today.getMonth() - 1);
             endDate = new Date(today);
     }
     const formatDate = (date) => {

@@ -20,11 +20,15 @@
                     <h1>Recursos Humanos</h1>
                 {% endif %}
             </div>
-            <div class="user-menu">
-            <a href="{% url 'logout' %}" id="logoutBtn" class="user-btn" title="Cerrar sesión" aria-label="Cerrar sesión">
+            <div class="user-menu" style="display: flex; flex-direction: row; align-items: center; gap: 15px;">
+                <button type="button" class="user-btn" onclick="openPasswordModal()" title="Cambiar Contraseña">
+                    <i class="fas fa-key"></i>
+                </button>
+    
+                <a href="{% url 'logout' %}" id="logoutBtn" class="user-btn" title="Cerrar sesión">
                     <i class="fas fa-sign-out-alt"></i>
-            </a>
-            </div>
+                </a>
+        </div>
         </header>
 
         <aside class="sidebar">
@@ -217,6 +221,51 @@
             </div>
         </main>
     </div>
+
+    <div id="passwordModal" class="modal" style="display: none; position: fixed !important; z-index: 99999 !important; left: 0 !important; top: 0 !important; width: 100% !important; height: 100% !important; background-color: rgba(0,0,0,0.6) !important; align-items: center; justify-content: center;">
+    
+    <div class="modal-content" style="position: absolute !important; top: 50% !important; left: 50% !important; transform: translate(-50%, -50%) !important; background-color: #fff !important; margin: 0 !important; padding: 0 !important; border: none !important; width: 90% !important; max-width: 400px !important; border-radius: 8px !important; overflow: hidden !important; box-shadow: 0 10px 25px rgba(0,0,0,0.5) !important;">
+        
+        <div class="modal-header" style="background-color: #851E23 !important; padding: 15px 20px !important; display: flex !important; justify-content: space-between !important; align-items: center !important; width: 100% !important; margin: 0 !important; border-bottom: none !important; box-sizing: border-box !important;">
+            <h3 style="margin: 0 !important; font-size: 16px !important; color: #ffffff !important; font-weight: bold !important; display: flex !important; align-items: center !important; gap: 10px !important; font-family: 'Varela Round', sans-serif !important;">
+                <i class="fas fa-lock" style="color: #ffffff !important;"></i> Cambiar Contraseña
+            </h3>
+            <span onclick="closePasswordModal()" style="color: #ffffff !important; font-size: 24px !important; cursor: pointer !important; line-height: 1 !important; opacity: 0.8;">&times;</span>
+        </div>
+        
+        <div class="modal-body-custom" style="padding: 20px 25px !important; background-color: #fff !important; text-align: left !important;">
+            <form id="passwordForm">
+                
+                <div class="input-group" style="margin-bottom: 15px !important;">
+                    <label for="newPassword" style="display: block !important; margin-bottom: 5px !important; font-weight: 600 !important; color: #333 !important; font-size: 13px !important; text-transform: uppercase;">Nueva Contraseña</label>
+                    <div style="position: relative !important;">
+                        <input type="password" id="newPassword" required placeholder="Ingresa nueva contraseña" style="width: 100% !important; padding: 10px !important; border: 1px solid #ccc !important; border-radius: 4px !important; padding-right: 35px !important; font-size: 14px !important; box-sizing: border-box !important; background: #f9f9f9 !important;">
+                        <i class="fas fa-eye" onclick="togglePassword('newPassword', this)" style="position: absolute !important; right: 10px !important; top: 50% !important; transform: translateY(-50%) !important; cursor: pointer !important; color: #666 !important; z-index: 10;"></i>
+                    </div>
+                </div>
+
+                <div class="input-group" style="margin-bottom: 20px !important;">
+                    <label for="confirmPassword" style="display: block !important; margin-bottom: 5px !important; font-weight: 600 !important; color: #333 !important; font-size: 13px !important; text-transform: uppercase;">Repite la contraseña nueva</label>
+                    <div style="position: relative !important;">
+                        <input type="password" id="confirmPassword" required placeholder="Repite la contraseña" style="width: 100% !important; padding: 10px !important; border: 1px solid #ccc !important; border-radius: 4px !important; padding-right: 35px !important; font-size: 14px !important; box-sizing: border-box !important; background: #f9f9f9 !important;">
+                        <i class="fas fa-eye" onclick="togglePassword('confirmPassword', this)" style="position: absolute !important; right: 10px !important; top: 50% !important; transform: translateY(-50%) !important; cursor: pointer !important; color: #666 !important; z-index: 10;"></i>
+                    </div>
+                </div>
+
+                <div class="modal-footer" style="padding: 15px 20px !important; display: flex !important; justify-content: flex-end !important; gap: 12px !important; background-color: #f8f9fa !important; border-top: 1px solid #eee !important; margin: 0 !important; border-radius: 0 0 8px 8px !important;">
+                    
+                    <button type="button" onclick="closePasswordModal()" style="background-color: #6c757d !important; color: white !important; border: none !important; padding: 10px 20px !important; border-radius: 6px !important; cursor: pointer !important; font-size: 14px !important; font-weight: 600 !important; transition: all 0.3s !important;">Cancelar</button>
+                    
+                    <button type="submit" style="background-color: #851E23 !important; color: white !important; border: none !important; padding: 10px 20px !important; border-radius: 6px !important; cursor: pointer !important; font-size: 14px !important; font-weight: 600 !important; transition: all 0.3s !important;">Actualizar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+    <script>
+      const URL_CAMBIAR_PASSWORD = "{% url 'cambiar_password_usuario' %}";
+    </script>
+    <script src="{% static 'js/admin_inicio.js' %}"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
