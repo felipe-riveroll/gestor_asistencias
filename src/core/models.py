@@ -115,6 +115,29 @@ class AsignacionHorario(models.Model):
             models.Index(fields=['tipo_turno']),
             models.Index(fields=['dia_especifico']),
         ]
+    # --- AGREGA todo ESTE BLOQUE AQUÍ ---
+    def _str_(self):
+        # 1. Obtenemos las horas correctas
+        if self.hora_entrada_especifica:
+            inicio = self.hora_entrada_especifica
+            fin = self.hora_salida_especifica
+        elif self.horario:
+            inicio = self.horario.hora_entrada
+            fin = self.horario.hora_salida
+        else:
+            return "Horario indefinido"
+
+        # Formateamos bonito (quitamos segundos extra si no son necesarios)
+        txt_inicio = inicio.strftime('%H:%M') if inicio else "??"
+        txt_fin = fin.strftime('%H:%M') if fin else "??"
+        
+        texto_base = f"{txt_inicio} - {txt_fin}"
+
+        # 2. Si tiene comentario, lo ponemos. Si no, devolvemos solo la hora.
+        if self.comentarios and self.comentarios.strip():
+            return f"{texto_base} ({self.comentarios})"
+        
+        return texto_base
 
 class ResumenHorario(models.Model):
     empleado_id = models.IntegerField(primary_key=True)

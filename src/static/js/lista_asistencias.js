@@ -8,7 +8,6 @@ document.addEventListener("DOMContentLoaded", function () {
     const retardosBody = document.getElementById("retardosBody");
     const btnPDF = document.getElementById("btnPDF");
     const btnExcel = document.getElementById("btnExcel");
-    const btnCSV = document.getElementById("btnCSV");
     const tabDetalle = document.getElementById("tabDetalle");
     const tabRetardos = document.getElementById("tabRetardos");
     const sectionDetalle = document.getElementById("Detalle");
@@ -116,12 +115,16 @@ document.addEventListener("DOMContentLoaded", function () {
     async function cargarDatos() {
         detalleBody.innerHTML = '<tr><td colspan="10" style="text-align: center;">Cargando...</td></tr>';
         retardosBody.innerHTML = '<tr><td colspan="8" style="text-align: center;">Cargando...</td></tr>';
-        [btnPDF, btnExcel, btnCSV].forEach(btn => btn.disabled = true);
+        [btnPDF, btnExcel].forEach(btn => {
+            if(btn) btn.disabled = true;
+        });
+
         const params = {
             startDate: fechaInicio.value,
             endDate: fechaFin.value,
             sucursal: sucursalSelect.value,
         };
+        
         if (!params.startDate || !params.endDate || !params.sucursal) {
             const msg = '<tr><td colspan="10" style="text-align: center;">Por favor, selecciona fechas y sucursal.</td></tr>';
             detalleBody.innerHTML = msg;
@@ -163,7 +166,9 @@ document.addEventListener("DOMContentLoaded", function () {
         pintarTablaDetalle(datosFiltrados, totalesEmpleados); 
         pintarTablaRetardos(datosRetardos);
         const hayDatos = datosFiltrados.length > 0;
-        [btnPDF, btnExcel, btnCSV].forEach(btn => btn.disabled = !hayDatos);
+        [btnPDF, btnExcel].forEach(btn => {
+            if(btn) btn.disabled = !hayDatos;
+        });
     }
 
     function pintarTablaDetalle(datos, totalesEmpleados) {
@@ -351,9 +356,6 @@ function pintarTablaRetardos(datos) {
                 case 'xlsx':
                     exportarExcelMultiHoja(nombreArchivoFinal);
                     break;
-                case 'csv':
-                    exportarTablaActualCSV(nombreArchivoFinal);
-                    break;
                 case 'pdf':
                     exportarTablaActualPDF(nombreArchivoFinal);
                     break;
@@ -421,32 +423,6 @@ function pintarTablaRetardos(datos) {
         });
     }
     
-    function exportarTablaActualCSV(nombreArchivo) {
-        if (typeof XLSX === 'undefined') {
-            throw new Error("La librería de exportación a CSV (SheetJS) no está disponible.");
-        }
-        const tabActiva = document.querySelector('.tablinks.active').id;
-        const data = tabActiva === 'tabDetalle' 
-            ? obtenerDatosDeTabla(detalleHeader, detalleBody)
-            : obtenerDatosDeTabla(document.querySelector('#tablaRetardos thead'), retardosBody);
-
-        if (!data) {
-            alert('No hay datos para exportar.');
-            return;
-        }
-        
-        const ws = XLSX.utils.aoa_to_sheet(data.datos);
-        const csvContent = XLSX.utils.sheet_to_csv(ws);
-        
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(blob);
-        link.setAttribute('download', `${nombreArchivo}_${tabActiva.replace('tab', '').toLowerCase()}.csv`);
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-    }
-    
     function exportarTablaActualPDF(nombreArchivo) {
         if (typeof jspdf === 'undefined' || typeof jspdf.jsPDF === 'undefined') {
              throw new Error("La librería de exportación a PDF (jsPDF) no está disponible.");
@@ -503,22 +479,44 @@ function pintarTablaRetardos(datos) {
         doc.save(`${nombreArchivo}_${tabActiva.replace('tab', '').toLowerCase()}.pdf`);
     }
 
-    [fechaInicio, fechaFin, sucursalSelect].forEach(el => el.addEventListener("change", cargarDatos));
-    buscarEmpleado.addEventListener("input", filtrarYRenderizar);
-    tabDetalle.addEventListener("click", switchTab);
-    tabRetardos.addEventListener("click", switchTab);
-    btnExcel.addEventListener('click', () => exportarA('xlsx'));
-    btnCSV.addEventListener('click', () => exportarA('csv'));
-    btnPDF.addEventListener('click', () => exportarA('pdf'));
+   // --- CONFIGURACIÓN INICIAL ---
+    if (buscarEmpleado) {
+        buscarEmpleado.addEventListener("input", filtrarYRenderizar);
+    }
+    // 2. Activar cambios en fechas y sucursal
+    [fechaInicio, fechaFin, sucursalSelect].forEach(el => {
+        if (el) el.addEventListener("change", cargarDatos);
+    });
 
+    // 3. Activar Tabs y Botones
+    if (tabDetalle) tabDetalle.addEventListener("click", switchTab);
+    if (tabRetardos) tabRetardos.addEventListener("click", switchTab);
+    
+    if (btnExcel) btnExcel.addEventListener('click', () => exportarA('xlsx'));
+    if (btnPDF) btnPDF.addEventListener('click', () => exportarA('pdf'));
+    
     const today = new Date();
-    const oneMonthAgo = new Date(); // <-- 1. LÍNEA CAMBIADA
+    const oneMonthAgo = new Date(); 
     oneMonthAgo.setMonth(today.getMonth() - 1);
     
-    const formatDate = (date) => date.toISOString().split('T')[0];
+    // Ajuste para zona horaria local (evita que salga un día antes)
+    const formatDate = (date) => {
+        const d = new Date(date);
+        d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+        return d.toISOString().split('T')[0];
+    };
     
-    fechaInicio.value = formatDate(oneMonthAgo);
-    fechaFin.value = formatDate(today);
+    if(fechaInicio) fechaInicio.value = formatDate(oneMonthAgo);
+    if(fechaFin) fechaFin.value = formatDate(today);
     
-    tabDetalle.click();
+    // --- AQUÍ ESTÁ LO QUE PEDISTE (SUCURSAL) ---
+    if(sucursalSelect) {
+        sucursalSelect.value = "Todas"; // Selecciona "Todas las Sucursales"
+    }
+    
+    if(tabDetalle) tabDetalle.click();
+
+    // --- EJECUTAR CARGA AUTOMÁTICA ---
+    // Es necesario llamar a esta función al final para que busque los datos
+    cargarDatos();
 });

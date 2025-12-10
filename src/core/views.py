@@ -878,18 +878,41 @@ def api_lista_sucursales(request):
 @login_required
 @require_http_methods(["GET"])
 def api_lista_horarios(request):
+    """
+    Envía una lista de todos los horarios en formato JSON
+    para rellenar los <select> del modal de edición.
+    """
     try:
-        horarios = Horario.objects.all().order_by('hora_entrada')
+        # Tus modelos ya están importados al inicio del archivo
+        horarios = Horario.objects.all().order_by('hora_entrada') # Ordenar para mejor UX
         
-        data = [
-            {
+        data = []
+        for h in horarios:
+            # Preparamos la descripción para saber si está vacía
+            descripcion = h.descripcion_horario.strip() if h.descripcion_horario else ""
+            
+            # LÓGICA CORREGIDA:
+            # Es flexible si:
+            # 1. NO tiene descripción (es un horario manual simple)
+            # 2. O tiene descripción, pero NO es puramente numérica (ej. "Turno Matutino")
+            es_flexible = True
+            if descripcion:
+                 # Si tiene descripción y parece un código numérico o hora simple, quizás quieras protegerlo.
+                 # Pero si tu intención es poder borrar los manuales, dejémoslo en True o validemos:
+                 if descripcion.replace(':', '').isdigit():
+                     es_flexible = False # Bloqueamos solo si la descripción son solo números
+            
+            # Opción más agresiva: Permitir borrar TODO lo que no sea de sistema
+            # es_flexible = True 
+
+            data.append({
                 "id": h.horario_id,
                 "texto": f"{h.hora_entrada.strftime('%H:%M')} - {h.hora_salida.strftime('%H:%M')}"
-                + (f" ({h.descripcion_horario})" if h.descripcion_horario else ""),
-                "es_flexible": True if h.descripcion_horario and not h.descripcion_horario.replace(':', '').isdigit() else False
-            }
-            for h in horarios
-        ]
+                         + (f" ({descripcion})" if descripcion else ""), # Solo añade paréntesis si hay texto
+                
+                # Aquí aplicamos la lógica corregida:
+                "es_flexible": es_flexible 
+            })
         return JsonResponse(data, safe=False)
     except Exception as e:
         return JsonResponse({"error": f"Error en API horarios: {str(e)}"}, status=500)
