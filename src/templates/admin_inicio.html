@@ -122,7 +122,6 @@
 
           <form id="adminForm" method="POST" action="{% url 'admin_page' %}">
             {% csrf_token %}
-            <input type="hidden" id="adminId" />
             <div class="form-grid">
               <input type="hidden" name="adminId" id="adminId" value="{{ admin_editar.empleado_id|default:'' }}" />
               <div class="input-group">

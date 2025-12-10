@@ -77,6 +77,9 @@ document.addEventListener("DOMContentLoaded", () => {
     // Limpia horarios agregados
     horariosAgregados.innerHTML = `<div class="empty-schedule">No hay horarios agregados</div>`;
     document.getElementById("modalTitle").innerText = "Agregar Empleado";
+
+    cargarSucursales(sucursalSelect);
+    cargarHorarios(horarioSelect);
   });
 
   // =================================================================
@@ -689,30 +692,6 @@ if (btnExportExcel) {
         setTimeout(() => {
             this.disabled = false;
             this.innerHTML = '<i class="fas fa-file-excel"></i> Exportar Excel';
-        }, 5000); 
-    });
-}
-
-// =================================================================
-// LÓGICA DE EXPORTACIÓN A PDF (DESCARGA DE LISTA DE EMPLEADOS)
-// =================================================================
-
-if (btnExportPDF) {
-    btnExportPDF.addEventListener("click", function (e) {
-        e.preventDefault(); 
-        
-        // Usamos la URL que definimos en urls.py
-        const urlDeDescarga = "/admin-gestion-empleados/exportar/pdf/"; 
-        
-        window.location.href = urlDeDescarga;
-        
-        // Opcional: Feedback visual durante la descarga
-        this.disabled = true;
-        this.textContent = "Generando PDF...";
-        
-        setTimeout(() => {
-            this.disabled = false;
-            this.innerHTML = '<i class="fas fa-file-pdf"></i> Exportar PDF';
         }, 5000); 
     });
 }
