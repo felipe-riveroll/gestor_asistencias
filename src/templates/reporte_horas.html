@@ -1,0 +1,199 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Reporte de Horas por Sucursal</title>
+
+  <!-- Fuentes e íconos -->
+  <link href="https://fonts.googleapis.com/css2?family=Varela+Round&display=swap" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" />
+
+  <!-- Estilos -->
+  <link rel="stylesheet" href="{% static 'css/menurh.css' %}">
+  <link rel="stylesheet" href="{% static 'css/reporte_horas.css' %}">
+  <link rel="icon" href="{% static 'img/logo.png' %}" type="image/png">
+
+  <!-- Librerías externas -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+</head>
+<body>
+  <div class="main-wrapper"> 
+        <header class="top-navbar">
+            <div class="logo">
+                <h1>Recursos Humanos</h1>
+            </div>
+            <div class="user-menu" style="display: flex; flex-direction: row; align-items: center; gap: 15px;">
+                <button type="button" class="user-btn" onclick="openPasswordModal()" title="Cambiar Contraseña">
+                    <i class="fas fa-key"></i>
+                </button>
+    
+                <a href="{% url 'logout' %}" id="logoutBtn" class="user-btn" title="Cerrar sesión">
+                    <i class="fas fa-sign-out-alt"></i>
+                </a>
+        </div>
+        </header>
+
+        <aside class="sidebar">
+            <nav class="main-menu">
+                <div class="menu-section">
+                    <h3 class="section-title">REPORTES</h3>
+                    <ul>
+                        <li class="menu-item">
+                            <a href="{% url 'reporte_horas' %}">
+                                <i class="fas fa-file-alt"></i>
+                                <span>Reporte de Horas</span>
+                            </a>
+                        </li>
+                        <li class="menu-item">
+                            <a href="{% url 'lista_asistencias' %}">
+                                <i class="fas fa-user-check"></i>
+                                <span>Reporte de Asistencias</span>
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </nav>
+            <div class="menu-section">
+                    <h3 class="section-title">PANEL DE GRÁFICAS</h3>
+                    <ul class="main-menu">
+                        <li class="menu-item">
+                            <a href="{% url 'grafica_general' %}">
+                                <i class="fas fa-globe"></i>
+                                <span>General</span>
+                            </a>
+                        </li>
+                        <li class="menu-item">
+                            <a href="{% url 'grafica_31pte' %}">
+                                <i class="fas fa-map-marker-alt"></i>
+                                <span>31pte</span>
+                            </a>
+                        </li>
+                        <li class="menu-item">
+                            <a href="{% url 'grafica_villas' %}">
+                                <i class="fas fa-map-marker-alt"></i>
+                                <span>Villas</span>
+                            </a>
+                        </li>
+                        <li class="menu-item">
+                            <a href="{% url 'grafica_nave' %}">
+                                <i class="fas fa-map-marker-alt"></i>
+                                <span>Nave</span>
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </nav>
+        </aside>
+
+    <!-- CONTENIDO PRINCIPAL -->
+    <div class="report-container">
+      <div class="header">
+        <h1>Reporte de Horas</h1>
+      </div>
+
+      <!-- FILTROS -->
+      <div class="filter-section">
+        <div class="filter-group">
+          <label for="startDate">Fecha inicio:</label>
+          <input type="date" id="startDate">
+        </div>
+        <div class="filter-group">
+          <label for="endDate">Fecha fin:</label>
+          <input type="date" id="endDate">
+        </div>
+        <div class="filter-group">
+          <label for="sucursal">Sucursal:</label>
+          <select id="sucursal">
+            <option value="Todas">Todas las sucursales</option>
+            <option value="Villas">Villas</option>
+            <option value="31pte">31 pte</option>
+            <option value="Nave">Nave</option>
+            <option value="RioBlanco">Río Blanco</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label for="empleado">Buscador:</label>
+          <input type="text" id="empleado" placeholder="Buscar...">
+        </div>
+
+        <div class="btn-group">
+          <button id="downloadBtn" class="btn btn-success">
+            <i class="fas fa-file-excel"></i> Descargar Excel
+          </button>
+        </div>
+      </div>
+      <!-- TABLA -->
+      <div class="table-container">
+        <table id="reporteTable" class="tabla-reporte">
+          <thead>
+            <tr>
+              <th>employee</th>
+              <th>Nombre</th>
+              <th>total_horas_trabajadas</th>
+              <th>total_horas_esperadas</th>
+              <th>total_horas_descontadas_permiso</th>
+              <th>total_horas_descanso</th>
+              <th>total_horas</th>
+              <th>total_retardos</th>
+              <th>faltas_del_periodo</th>
+              <th>faltas_justificadas</th>
+              <th>total_faltas</th>
+              <th>episodios_ausencia</th>
+              <th>total_salidas_anticipadas</th>
+              <th>diferencia_HHMMSS</th>
+            </tr>
+          </thead>
+          <tbody id="reporteBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+ <div id="passwordModal" class="modal">
+    <div class="modal-content">
+        
+        <div class="modal-header">
+            <h3>
+                <i class="fas fa-lock"></i> Cambiar Contraseña
+            </h3>
+            <span class="close-modal" onclick="closePasswordModal()">&times;</span>
+        </div>
+        
+        <div class="modal-body-custom">
+            <form id="passwordForm">
+                
+                <div class="input-group">
+                    <label for="newPassword">Nueva Contraseña</label>
+                    <div class="password-container">
+                        <input type="password" id="newPassword" required placeholder="Ingresa nueva contraseña">
+                        <i class="fas fa-eye password-toggle" onclick="togglePassword('newPassword', this)"></i>
+                    </div>
+                </div>
+
+                <div class="input-group">
+                    <label for="confirmPassword">Repite la contraseña nueva</label>
+                    <div class="password-container">
+                        <input type="password" id="confirmPassword" required placeholder="Repite la contraseña">
+                        <i class="fas fa-eye password-toggle" onclick="togglePassword('confirmPassword', this)"></i>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn-modal btn-secondary" onclick="closePasswordModal()">Cancelar</button>
+                    <button type="submit" class="btn-modal btn-primary">Actualizar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+    <script>
+      const URL_CAMBIAR_PASSWORD = "{% url 'cambiar_password_usuario' %}";
+    </script>
+    <script src="{% static 'js/admin_inicio.js' %}"></script>
+  <!-- Script personalizado -->
+  <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+  <script src="{% static 'js/reporte_horas.js' %}"></script>
+</body>
+</html>

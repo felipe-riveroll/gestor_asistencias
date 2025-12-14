@@ -1,0 +1,233 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Reporte de Checadas</title>
+    <link rel="stylesheet" href="{% static 'css/lista_asistencias.css' %}">
+    <link rel="stylesheet" href="{% static 'css/menurh.css' %}">
+    <link rel="icon" href="{% static 'img/logo.png' %}" type="image/png">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Varela+Round&display=swap" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet" />
+    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
+</head>
+<body>
+    <div class="main-wrapper"> 
+        <header class="top-navbar">
+            <div class="logo">
+                <h1>Recursos Humanos</h1>
+            </div>
+            <div class="user-menu" style="display: flex; flex-direction: row; align-items: center; gap: 15px;">
+                <button type="button" class="user-btn" onclick="openPasswordModal()" title="Cambiar Contraseña">
+                    <i class="fas fa-key"></i>
+                </button>
+    
+                <a href="{% url 'logout' %}" id="logoutBtn" class="user-btn" title="Cerrar sesión">
+                    <i class="fas fa-sign-out-alt"></i>
+                </a>
+        </div>
+        </header>
+
+        <aside class="sidebar">
+            <nav class="main-menu">
+                <div class="menu-section">
+                    <h3 class="section-title">REPORTES</h3>
+                    <ul>
+                        <li class="menu-item">
+                            <a href="{% url 'reporte_horas' %}">
+                                <i class="fas fa-file-alt"></i>
+                                <span>Reporte de Horas</span>
+                            </a>
+                        </li>
+                        <li class="menu-item">
+                            <a href="{% url 'lista_asistencias' %}">
+                                <i class="fas fa-user-check"></i>
+                                <span>Reporte de Asistencias</span>
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </nav>
+            <div class="menu-section">
+                    <h3 class="section-title">PANEL DE GRÁFICAS</h3>
+                    <ul class="main-menu">
+                        <li class="menu-item">
+                            <a href="{% url 'grafica_general' %}">
+                                <i class="fas fa-globe"></i>
+                                <span>General</span>
+                            </a>
+                        </li>
+                        <li class="menu-item">
+                            <a href="{% url 'grafica_31pte' %}">
+                                <i class="fas fa-map-marker-alt"></i>
+                                <span>31pte</span>
+                            </a>
+                        </li>
+                        <li class="menu-item">
+                            <a href="{% url 'grafica_villas' %}">
+                                <i class="fas fa-map-marker-alt"></i>
+                                <span>Villas</span>
+                            </a>
+                        </li>
+                        <li class="menu-item">
+                            <a href="{% url 'grafica_nave' %}">
+                                <i class="fas fa-map-marker-alt"></i>
+                                <span>Nave</span>
+                            </a>
+                        </li>
+                        
+                    </ul>
+                </div>
+            </nav>
+        </aside>
+
+        <main class="report-container" role="main" aria-label="Reporte de checadas">
+            <section class="filter-section" aria-label="Filtros de reporte">
+                <div class="filter-group">
+                    <label for="fechaInicio">Fecha Inicio</label>
+                    <input type="date" id="fechaInicio" class="form-control">
+                </div>
+                <div class="filter-group">
+                    <label for="fechaFin">Fecha Fin</label>
+                    <input type="date" id="fechaFin" class="form-control">
+                </div>
+                <div class="filter-group">
+                    <label for="sucursal">Sucursal</label>
+                    <select id="sucursal" aria-required="true">
+                        <option value="" disabled selected>Seleccione una sucursal</option>
+                        <option value="Todas">Todas las Sucursales</option>
+                        {% for s in sucursales %}
+                            <option value="{{ s.nombre_sucursal }}">{{ s.nombre_sucursal }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="search-container">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input type="text" id="buscarEmpleado" placeholder="Buscar empleado...">
+                </div>
+                <div class="btn-group export-buttons">
+                    <button id="btnExcel" class="btn-excel"><i class="fa-solid fa-file-excel"></i> Excel</button>
+                    <button id="btnPDF" class="btn-pdf"><i class="fa-solid fa-file-pdf"></i> PDF</button>
+                </div>
+            </section>
+
+            <h2>Reporte de Checadas</h2>
+
+            <nav class="tab" role="tablist">
+                <button class="tablinks active" id="tabDetalle" aria-selected="true" role="tab">Detalle</button>
+                <button class="tablinks" id="tabRetardos" aria-selected="false" role="tab">Retardos</button>
+            </nav>
+
+            <section id="Detalle" class="tabcontent active" role="tabpanel">
+    <table id="tablaDetalle">
+        <thead id="tablaDetalleHeader">
+            <tr>
+                <th>ID Empleado</th>
+                <th>Nombre</th>
+                <th>Turno</th>
+                <th>Fecha</th>
+                <th>Día</th>
+                <th>Horas Esperadas</th>
+                <th>Horas Totales</th>
+                <th>Checada 1</th>
+                <th>Checada 2</th>
+                <th>Checada 3</th>
+                <th>Checada 4</th>
+                <th>Checada 5</th>
+                <th>Checada 6</th>
+                <th>Observaciones</th>
+            </tr>
+        </thead>
+        
+        <tbody id="detalleBody">
+            {% if checada_list %} 
+                {% for checada in checada_list %}
+                    {% endfor %}
+            {% else %}
+                <tr>
+                    <td colspan="12" style="text-align: center; color: #6c757d;">
+                        No se encontraron checadas en este período.
+                    </td>
+                </tr>
+            {% endif %}
+        </tbody>
+    </table>
+</section>
+
+           <section id="Retardos" class="tabcontent" role="tabpanel" style="display: none;">
+    <table id="tablaRetardos">
+        <thead>
+            <tr>
+                <th>ID Empleado</th>
+                <th>Nombre</th>
+                <th>Sucursal</th>
+                <th>Fecha</th>
+                <th>Día</th>
+                <th>Hora Esperada</th>
+                <th>Hora Real</th>
+                <th>Observaciones</th>
+            </tr>
+        </thead>
+        <tbody id="retardosBody">
+            {% if retardos_list %} 
+                {% for retardo in retardos_list %}
+                    {% endfor %}
+            {% else %}
+                <tr>
+                    <td colspan="8" style="text-align: center; color: #6c757d;">
+                        No se encontraron retardos en este período.
+                    </td>
+                </tr>
+            {% endif %}
+        </tbody>
+    </table>
+</section>
+        </main>
+    </div>
+     <div id="passwordModal" class="modal" style="display: none; position: fixed !important; z-index: 9999 !important; left: 0 !important; top: 0 !important; width: 100% !important; height: 100% !important; background-color: rgba(0,0,0,0.6) !important;">
+        <div class="modal-content" style="position: absolute !important; top: 50% !important; left: 50% !important; transform: translate(-50%, -50%) !important; background-color: #fff !important; margin: 0 !important; padding: 0 !important; border: none !important; width: 90% !important; max-width: 400px !important; border-radius: 8px !important; overflow: hidden !important; box-shadow: 0 10px 25px rgba(0,0,0,0.5) !important;">
+            
+            <div class="modal-header" style="background-color: #851E23 !important; padding: 15px 20px !important; display: flex !important; justify-content: space-between !important; align-items: center !important; width: 100% !important; margin: 0 !important; border-bottom: none !important; box-sizing: border-box !important;">
+                <h3 style="margin: 0 !important; font-size: 16px !important; color: #ffffff !important; font-weight: bold !important; display: flex !important; align-items: center !important; gap: 10px !important;">
+                    <i class="fas fa-lock" style="color: #ffffff !important;"></i> Cambiar Contraseña
+                </h3>
+                <span onclick="closePasswordModal()" style="color: #ffffff !important; font-size: 24px !important; cursor: pointer !important; line-height: 1 !important; opacity: 0.8;">&times;</span>
+            </div>
+            
+            <div class="modal-body-custom" style="padding: 20px 25px !important; background-color: #fff !important; text-align: left !important;">
+                <form id="passwordForm">
+                    <div class="input-group" style="margin-bottom: 15px !important;">
+                        <label for="newPassword" style="display: block !important; margin-bottom: 5px !important; font-weight: 600 !important; color: #333 !important; font-size: 14px !important;">Nueva Contraseña</label>
+                        <div style="position: relative !important;">
+                            <input type="password" id="newPassword" required placeholder="Ingresa nueva contraseña" style="width: 100% !important; padding: 10px !important; border: 1px solid #ccc !important; border-radius: 4px !important; padding-right: 35px !important; font-size: 14px !important; box-sizing: border-box !important;">
+                            <i class="fas fa-eye" onclick="togglePassword('newPassword', this)" style="position: absolute !important; right: 10px !important; top: 50% !important; transform: translateY(-50%) !important; cursor: pointer !important; color: #666 !important; z-index: 10;"></i>
+                        </div>
+                    </div>
+
+                    <div class="input-group" style="margin-bottom: 20px !important;">
+                        <label for="confirmPassword" style="display: block !important; margin-bottom: 5px !important; font-weight: 600 !important; color: #333 !important; font-size: 14px !important;">Repite la contraseña nueva</label>
+                        <div style="position: relative !important;">
+                            <input type="password" id="confirmPassword" required placeholder="Repite la contraseña" style="width: 100% !important; padding: 10px !important; border: 1px solid #ccc !important; border-radius: 4px !important; padding-right: 35px !important; font-size: 14px !important; box-sizing: border-box !important;">
+                            <i class="fas fa-eye" onclick="togglePassword('confirmPassword', this)" style="position: absolute !important; right: 10px !important; top: 50% !important; transform: translateY(-50%) !important; cursor: pointer !important; color: #666 !important; z-index: 10;"></i>
+                        </div>
+                    </div>
+
+                    <div class="modal-footer" style="padding: 15px 20px !important; display: flex !important; justify-content: flex-end !important; gap: 10px !important; background-color: #f8f9fa !important; border-top: 1px solid #eee !important; margin: 0 !important; border-radius: 0 0 8px 8px !important;">
+                        <button type="button" onclick="closePasswordModal()" style="padding: 10px 20px !important; border: none !important; border-radius: 4px !important; cursor: pointer !important; font-size: 14px !important; font-weight: 600 !important; background-color: #6c757d !important; color: white !important;">Cancelar</button>
+                        <button type="submit" style="padding: 10px 20px !important; border: none !important; border-radius: 4px !important; cursor: pointer !important; font-size: 14px !important; font-weight: 600 !important; background-color: #851E23 !important; color: white !important;">Actualizar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <script>
+      const URL_CAMBIAR_PASSWORD = "{% url 'cambiar_password_usuario' %}";
+    </script>
+    <script src="{% static 'js/admin_inicio.js' %}"></script>
+    <script src="{% static 'js/lista_asistencias.js' %}"></script>
+</body>
+</html>

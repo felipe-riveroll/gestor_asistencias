@@ -1,0 +1,275 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Villas - Recursos Humanos</title>
+    <link rel="icon" href="{% static 'img/logo.png' %}" type="image/png">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="stylesheet" href="{% static 'css/grafica_villas.css' %}?v=5"> 
+    <link href="https://fonts.googleapis.com/css2?family=Varela+Round&display=swap" rel="stylesheet" />
+</head>
+<body>
+  <div class="main-wrapper"> 
+        <header class="top-navbar">
+            <div class="logo">
+                {% if is_admin %}
+                    <h1>Panel de Administración</h1>
+                {% else %}
+                    <h1>Recursos Humanos</h1>
+                {% endif %}
+            </div>
+            <div class="user-menu" style="display: flex; flex-direction: row; align-items: center; gap: 15px;">
+                <button type="button" class="user-btn" onclick="openPasswordModal()" title="Cambiar Contraseña">
+                    <i class="fas fa-key"></i>
+                </button>
+    
+                <a href="{% url 'logout' %}" id="logoutBtn" class="user-btn" title="Cerrar sesión">
+                    <i class="fas fa-sign-out-alt"></i>
+                </a>
+        </div>
+        </header>
+
+        <aside class="sidebar">
+            <nav class="main-menu">
+                
+                {% if not is_admin %}
+                <div class="menu-section">
+                    <h3 class="section-title">REPORTES</h3>
+                    <ul>
+                        <li class="menu-item">
+                            <a href="{% url 'reporte_horas' %}">
+                                <i class="fas fa-file-alt"></i>
+                                <span>Reporte de Horas</span>
+                            </a>
+                        </li>
+                        <li class="menu-item">
+                            <a href="{% url 'lista_asistencias' %}">
+                                <i class="fas fa-user-check"></i>
+                                <span>Reporte de Asistencias</span>
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+                {% endif %}
+                
+                {% if is_admin %}
+                <div class="menu-section admin-menu-section">
+                    <h3 class="section-title">GESTIÓN</h3>
+                    <ul>
+                        <li class="menu-item">
+                            <a href="{% url 'admin-gestion-empleados' %}">
+                                <i class="fas fa-users-cog"></i>
+                                <span>Gestión de empleados</span>
+                            </a>
+                        </li>
+                        <li class="menu-item">
+                            <a href="{% url 'admin_page' %}">
+                                <i class="fas fa-users"></i>
+                                <span>Gestión de Administradores</span>
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+                {% endif %}
+
+                <div class="menu-section">
+                    <h3 class="section-title">PANEL DE GRÁFICAS</h3>
+                    <ul class="main-menu">
+                        <li class="menu-item"> <a href="{% url 'grafica_general' %}">
+                                <i class="fas fa-globe"></i>
+                                <span>General</span>
+                            </a>
+                        </li>
+                        <li class="menu-item">
+                            <a href="{% url 'grafica_31pte' %}">
+                                <i class="fas fa-map-marker-alt"></i>
+                                <span>31pte</span>
+                            </a>
+                        </li>
+                        <li class="menu-item">
+                            <a href="{% url 'grafica_villas' %}">
+                                <i class="fas fa-map-marker-alt"></i>
+                                <span>Villas</span>
+                            </a>
+                        </li>
+                        <li class="menu-item">
+                            <a href="{% url 'grafica_nave' %}">
+                                <i class="fas fa-map-marker-alt"></i>
+                                <span>Nave</span>
+                            </a>
+                        </li>
+                        
+                    </ul>
+                </div>
+            </nav>
+        </aside>
+
+        <main class="content-area">
+            <div class="dashboard-header">
+                <h1 class="dashboard-title"><i class="fa-solid fa-chart-line"></i> Dashboard: Sucursal Villas</h1>
+                <div class="header-actions">
+                    <button id="exportExcelBtn" class="export-btn"><i class="fa-solid fa-file-excel"></i> Exportar a Excel</button>
+                </div>
+            </div>
+
+            <div class="filters-section">
+                <div class="filter-group">
+                    <div class="filter-item">
+                        <label for="dateRange">Rango de Fechas</label>
+                        <select id="dateRange" class="date-selector">
+                            <option value="today">Hoy</option>
+                            <option value="week">Esta Semana</option>
+                            <option value="month" selected>Este Mes</option>
+                            <option value="quarter">Este Trimestre</option>
+                            <option value="year">Este Año</option>
+                            <option value="custom">Personalizado</option>
+                        </select>
+                    </div>
+                     <div class="filter-item custom-dates-wrapper" style="display: none;">
+                        <div class="filter-item custom-dates" id="customDates">
+                             <label for="startDate">Fecha Inicio</label>
+                             <input type="date" id="startDate">
+                        </div>
+                        <div class="filter-item custom-dates" id="customDatesEnd">
+                             <label for="endDate">Fecha Fin</label>
+                             <input type="date" id="endDate">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="loading-state" id="loadingState" style="display: none;"><div class="spinner"></div><p>Cargando datos...</p></div>
+            <div class="no-data-message" id="noDataMessage" style="display: none;"><i class="fa-solid fa-database"></i><h2>No hay datos</h2><p>No se encontraron registros</p></div>
+
+            <div class="dashboard-content" id="dashboardContent" style="display: none;">
+
+                <div class="main-kpis">
+                     <div class="kpi-card primary"><div class="kpi-icon"><i class="fa-solid fa-users"></i></div><div class="kpi-content"><div class="kpi-value" id="totalEmployees">0</div><div class="kpi-label">Total Empleados</div></div></div>
+                     <div class="kpi-card success"><div class="kpi-icon"><i class="fa-solid fa-chart-line"></i></div><div class="kpi-content"><div class="kpi-value" id="avgEfficiency">0%</div><div class="kpi-label">Eficiencia Promedio</div></div></div>
+                     <div class="kpi-card warning"><div class="kpi-icon"><i class="fa-solid fa-clock"></i></div><div class="kpi-content"><div class="kpi-value" id="avgPunctuality">0%</div><div class="kpi-label">Puntualidad Promedio</div></div></div>
+                     <div class="kpi-card danger"><div class="kpi-icon"><i class="fa-solid fa-user-xmark"></i></div><div class="kpi-content"><div class="kpi-value" id="totalAbsences">0</div><div class="kpi-label">Ausencias Totales</div></div></div>
+                 </div>
+
+                <div class="charts-section">
+                     <div class="chart-row">
+                         <div class="chart-card large">
+                             <div class="chart-header"><h3>Resumen del Periodo (Villas)</h3></div>
+                             <div class="chart-container"><canvas id="periodEventsChart"></canvas></div>
+                         </div>
+                     </div>
+                     <div class="chart-row">
+                         <div class="chart-card">
+                             <div class="chart-header"><h3>Distribución de SIC (Empleados de Villas)</h3></div>
+                             <div class="chart-container"><canvas id="sicDistributionChart"></canvas></div>
+                         </div>
+                         <div class="chart-card">
+                             <div class="chart-header"><h3>Top Empleados por Eficiencia</h3></div>
+                             <div class="chart-container"><canvas id="topEfficiencyChart"></canvas></div>
+                         </div>
+                     </div>
+                     
+                     <div class="chart-row" style="display: none;">
+                         <div class="chart-card"><div class="chart-header"><h3>Eficiencia (Villas)</h3></div><div class="chart-container"><canvas id="branchEfficiencyChart"></canvas></div></div>
+                         <div class="chart-card"><div class="chart-header"><h3>Comparativa</h3></div><div class="chart-container"><canvas id="branchComparisonChart"></canvas></div></div>
+                     </div>
+                 </div>
+
+                <div class="table-tabs-section">
+                     <div class="tab-buttons">
+                         <button class="tab-button active" data-tab="summary">Resumen Horas</button>
+                         <button class="tab-button" data-tab="kpis">KPIs Rendimiento</button>
+                     </div>
+                     <div class="search-input-wrapper general-search">
+                         <label for="employeeSearchInput">Buscar Empleado (ID o Nombre)</label>
+                         <input type="text" id="employeeSearchInput" placeholder="Escribe para buscar...">
+                         <i class="fas fa-search search-icon"></i>
+                     </div>
+
+                     <div class="tab-content-container">
+                         <div class="tab-content active" id="summary">
+                             <div class="table-section">
+                                 <div class="section-header"><h3>Resumen de Horas por Empleado (Villas)</h3></div>
+                                 <div class="table-container">
+                                     <table id="employeeSummaryTable">
+                                         <thead><tr><th>ID</th><th>Empleado</th><th>Hrs. Trabajadas</th><th>Hrs. Planificadas</th><th>Variación</th><th>Retardos</th><th>Ausencias</th></tr></thead>
+                                         <tbody id="employeeSummaryTableBody"></tbody>
+                                     </table>
+                                 </div>
+                             </div>
+                         </div>
+                         <div class="tab-content" id="kpis">
+                             <div class="table-section employee-kpi-section">
+                                 <div class="section-header"><h3>Indicadores de Rendimiento Individual (Villas)</h3></div>
+                                 <div class="table-container">
+                                     <table id="employeeKpiTable">
+                                         <thead>
+                                             <tr>
+                                                 <th>ID</th>
+                                                 <th>Nombre</th>
+                                                 <th>Faltas Just.</th> <th>Tasa Ausentismo (%)</th>
+                                                 <th>Puntualidad (%)</th> <th>Eficiencia (%)</th> <th>SIC</th>
+                                             </tr>
+                                         </thead>
+                                         <tbody id="employeeKpiTableBody"></tbody>
+                                     </table>
+                                 </div>
+                             </div>
+                         </div>
+                     </div>
+                </div>
+            </div>
+        </main>
+    </div>
+     <div id="passwordModal" class="modal" style="display: none; position: fixed !important; z-index: 99999 !important; left: 0 !important; top: 0 !important; width: 100% !important; height: 100% !important; background-color: rgba(0,0,0,0.6) !important; align-items: center; justify-content: center;">
+    
+    <div class="modal-content" style="position: absolute !important; top: 50% !important; left: 50% !important; transform: translate(-50%, -50%) !important; background-color: #fff !important; margin: 0 !important; padding: 0 !important; border: none !important; width: 90% !important; max-width: 400px !important; border-radius: 8px !important; overflow: hidden !important; box-shadow: 0 10px 25px rgba(0,0,0,0.5) !important;">
+        
+        <div class="modal-header" style="background-color: #851E23 !important; padding: 15px 20px !important; display: flex !important; justify-content: space-between !important; align-items: center !important; width: 100% !important; margin: 0 !important; border-bottom: none !important; box-sizing: border-box !important;">
+            <h3 style="margin: 0 !important; font-size: 16px !important; color: #ffffff !important; font-weight: bold !important; display: flex !important; align-items: center !important; gap: 10px !important; font-family: 'Varela Round', sans-serif !important;">
+                <i class="fas fa-lock" style="color: #ffffff !important;"></i> Cambiar Contraseña
+            </h3>
+            <span onclick="closePasswordModal()" style="color: #ffffff !important; font-size: 24px !important; cursor: pointer !important; line-height: 1 !important; opacity: 0.8;">&times;</span>
+        </div>
+        
+        <div class="modal-body-custom" style="padding: 20px 25px !important; background-color: #fff !important; text-align: left !important;">
+            <form id="passwordForm">
+                
+                <div class="input-group" style="margin-bottom: 15px !important;">
+                    <label for="newPassword" style="display: block !important; margin-bottom: 5px !important; font-weight: 600 !important; color: #333 !important; font-size: 13px !important; text-transform: uppercase;">Nueva Contraseña</label>
+                    <div style="position: relative !important;">
+                        <input type="password" id="newPassword" required placeholder="Ingresa nueva contraseña" style="width: 100% !important; padding: 10px !important; border: 1px solid #ccc !important; border-radius: 4px !important; padding-right: 35px !important; font-size: 14px !important; box-sizing: border-box !important; background: #f9f9f9 !important;">
+                        <i class="fas fa-eye" onclick="togglePassword('newPassword', this)" style="position: absolute !important; right: 10px !important; top: 50% !important; transform: translateY(-50%) !important; cursor: pointer !important; color: #666 !important; z-index: 10;"></i>
+                    </div>
+                </div>
+
+                <div class="input-group" style="margin-bottom: 20px !important;">
+                    <label for="confirmPassword" style="display: block !important; margin-bottom: 5px !important; font-weight: 600 !important; color: #333 !important; font-size: 13px !important; text-transform: uppercase;">Repite la contraseña nueva</label>
+                    <div style="position: relative !important;">
+                        <input type="password" id="confirmPassword" required placeholder="Repite la contraseña" style="width: 100% !important; padding: 10px !important; border: 1px solid #ccc !important; border-radius: 4px !important; padding-right: 35px !important; font-size: 14px !important; box-sizing: border-box !important; background: #f9f9f9 !important;">
+                        <i class="fas fa-eye" onclick="togglePassword('confirmPassword', this)" style="position: absolute !important; right: 10px !important; top: 50% !important; transform: translateY(-50%) !important; cursor: pointer !important; color: #666 !important; z-index: 10;"></i>
+                    </div>
+                </div>
+
+                <div class="modal-footer" style="padding: 15px 20px !important; display: flex !important; justify-content: flex-end !important; gap: 12px !important; background-color: #f8f9fa !important; border-top: 1px solid #eee !important; margin: 0 !important; border-radius: 0 0 8px 8px !important;">
+                    
+                    <button type="button" onclick="closePasswordModal()" style="background-color: #6c757d !important; color: white !important; border: none !important; padding: 10px 20px !important; border-radius: 6px !important; cursor: pointer !important; font-size: 14px !important; font-weight: 600 !important; transition: all 0.3s !important;">Cancelar</button>
+                    
+                    <button type="submit" style="background-color: #851E23 !important; color: white !important; border: none !important; padding: 10px 20px !important; border-radius: 6px !important; cursor: pointer !important; font-size: 14px !important; font-weight: 600 !important; transition: all 0.3s !important;">Actualizar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+    <script>
+      const URL_CAMBIAR_PASSWORD = "{% url 'cambiar_password_usuario' %}";
+    </script>
+    <script src="{% static 'js/admin_inicio.js' %}"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    
+    <script src="{% static 'js/grafica_villas.js' %}"></script>
+</body>
+</html>
