@@ -75,7 +75,8 @@ staticfiles/
 
 # Env files
 .env
-.env.*
+.env.local
+.env.production
 
 # Others
 *.swp
