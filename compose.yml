@@ -1,7 +1,7 @@
 services:
 
   web:
-    build: .
+    image: ghcr.io/felipe-riveroll/gestor_asistencias:latest
     container_name: asistencias_web
     command: >
       sh -c "python manage.py collectstatic --noinput && gunicorn asistencias.wsgi:application --bind 0.0.0.0:8000 --workers=3 --worker-class=gthread --threads=4 --timeout 300"
