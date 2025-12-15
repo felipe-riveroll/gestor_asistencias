@@ -16,10 +16,15 @@ RUN apt-get update && apt-get install -y \
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
-COPY src/requirements.txt .
+# Install Python dependencies first
+COPY requirements.txt .
 RUN uv pip install -r requirements.txt --system
 
+# Copy application code
 COPY src/ .
+
+# Make entrypoint executable
+RUN chmod +x entrypoint.sh
 
 EXPOSE 8000
 
