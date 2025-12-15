@@ -174,6 +174,8 @@ CSRF_TRUSTED_ORIGINS = [
     "http://localhost:8000",
     "http://127.0.0.1",
     "http://127.0.0.1:8000",
+    "https://asistencias.asiatech.com.mx",
+    "http://asistencias.asiatech.com.mx",
 ]
 
 # Corrección de rutas de Login
@@ -229,7 +231,8 @@ X_FRAME_OPTIONS = 'DENY'
 
 # Cookies seguras (solo en producción cuando se usa HTTPS)
 if not DEBUG:
-    SECURE_SSL_REDIRECT = True
+    # Deshabilitar redirección SSL ya que Caddy maneja HTTPS
+    SECURE_SSL_REDIRECT = False
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
     SESSION_COOKIE_HTTPONLY = True
