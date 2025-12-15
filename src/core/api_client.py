@@ -23,8 +23,8 @@ class APIClient:
         self.checkin_url = API_URL
         self.leave_url = LEAVE_API_URL
         self.employee_url = EMPLOYEE_API_URL
-        self.page_length = 100
-        self.timeout = 30
+        self.page_length = 5000
+        self.timeout = 180
     
     def fetch_checkins(self, start_date: str, end_date: str, device_filter: str) -> List[Dict[str, Any]]:
         """
