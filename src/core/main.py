@@ -123,9 +123,6 @@ def generar_datos_dashboard_general(start_date: str, end_date: str) -> dict:
         if df_resumen.empty or df_detalle.empty:
             return {"success": True, "data": empty_data}
 
-        # =========================================================
-        # 🔥🔥🔥 BLOQUE NUEVO: FILTRADO DE EMPLEADOS ACTIVOS 🔥🔥🔥
-        # =========================================================
         # Esto elimina a los "borrados" (Elvis) de TODO el dashboard (totales y listas)
         try:
             from core.models import Empleado
@@ -164,7 +161,6 @@ def generar_datos_dashboard_general(start_date: str, end_date: str) -> dict:
             # Si falla el filtrado (ej. error de DB), imprimimos pero continuamos con lo que haya
             print(f"Advertencia al filtrar activos: {e}")
         # =========================================================
-
 
         # 3. Métricas y Agregados (Ahora ya limpios sin el empleado borrado)
         df_metricas = calcular_metricas_adicionales(df_resumen.copy(), df_detalle.copy())
