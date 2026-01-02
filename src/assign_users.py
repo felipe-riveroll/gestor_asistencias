@@ -2,8 +2,8 @@ from django.contrib.auth.models import User, Group
 from core.models import Empleado
 
 # 1️⃣ Datos del nuevo usuario
-nombre_usuario = "Evelyn"  # nombre de usuario
-correo = "evelyn@example.com"
+nombre_usuario = "Elizabeth"  # nombre de usuario
+correo = "elizabeth@example.com"
 password = "12345678"
 
 # 2️⃣ Crear usuario en Django Auth
@@ -22,7 +22,7 @@ user.save()
 print ("Usuario creado con éxito")
 
 # 4️⃣ Vincular con el empleado
-empleado = Empleado.objects.get(codigo_frappe=93)
+empleado = Empleado.objects.get(codigo_frappe=87)
 empleado.user = user
 empleado.save()
 

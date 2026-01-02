@@ -16,22 +16,15 @@ document.addEventListener("DOMContentLoaded", function () {
     let todasLasAsistencias = [];
 
     // ==========================================================
-    // FUNCIONES DE UTILIDAD PARA TIEMPO (CORREGIDAS)
+    // FUNCIONES DE UTILIDAD PARA TIEMPO
     // ==========================================================
 
-    /**
-     * Convierte una duración 'HH:MM:SS' a segundos totales.
-     * Es robusta contra valores nulos o malformados.
-     * @param {string} duracion - Duración en formato 'HH:MM:SS'.
-     * @returns {number} Segundos totales.
-     */
     function duracionASegundos(duracion) {
         if (typeof duracion !== 'string' || !duracion || duracion === '00:00:00' || duracion === '-') return 0;
         
         const partes = duracion.split(':');
         if (partes.length !== 3) return 0;
         
-        // Usamos parseInt y manejamos NaN si las partes no son números
         const h = parseInt(partes[0]) || 0;
         const m = parseInt(partes[1]) || 0;
         const s = parseInt(partes[2]) || 0;
@@ -39,13 +32,8 @@ document.addEventListener("DOMContentLoaded", function () {
         return (h * 3600) + (m * 60) + s;
     }
 
-    /**
-     * Convierte una cantidad de segundos totales a formato 'H:MM:SS'.
-     * @param {number|string} segundos - Segundos totales.
-     * @returns {string} Duración en formato 'H:MM:SS' (horas pueden ser > 24).
-     */
     function segundosADuracion(segundos) {
-        let totalSegundos = Number(segundos) || 0; // Asegura que sea un número válido
+        let totalSegundos = Number(segundos) || 0;
         if (totalSegundos < 0) totalSegundos = 0;
         
         const h = Math.floor(totalSegundos / 3600);
@@ -53,18 +41,12 @@ document.addEventListener("DOMContentLoaded", function () {
         const m = Math.floor(segundosRestantes / 60);
         const s = segundosRestantes % 60;
 
-        // Aseguramos padding de 2 dígitos para minutos y segundos
         const minutosStr = m.toString().padStart(2, '0');
         const segundosStr = s.toString().padStart(2, '0');
         
         return `${h}:${minutosStr}:${segundosStr}`;
     }
 
-    /**
-     * Calcula la suma de Horas Totales y Horas Esperadas por empleado.
-     * @param {Array} datos - Lista de registros de asistencia filtrados.
-     * @returns {Object} Un objeto donde la clave es el ID de empleado y el valor son los totales.
-     */
     function calcularTotalesPorEmpleado(datos) {
         const totales = {};
 
@@ -73,13 +55,10 @@ document.addEventListener("DOMContentLoaded", function () {
             const nombre = d.Nombre;
             const horasTrabajadasSegundos = duracionASegundos(d.duration);
             
-            // Lógica robusta para Horas Esperadas: acepta segundos (32400) o string de tiempo ('09:00:00')
             let horasEsperadasSegundos = Number(d.horas_esperadas);
             if (isNaN(horasEsperadasSegundos) || horasEsperadasSegundos === 0) {
-                // Intenta parsear como HH:MM:SS si no era un número válido
                 horasEsperadasSegundos = duracionASegundos(String(d.horas_esperadas));
             }
-
 
             if (!totales[id]) {
                 totales[id] = {
@@ -93,13 +72,11 @@ document.addEventListener("DOMContentLoaded", function () {
             totales[id].totalHorasSegundos += horasTrabajadasSegundos;
             totales[id].totalEsperadasSegundos += horasEsperadasSegundos;
 
-            // Contar días (lógica existente, ajustada para que el conteo de la imagen sea correcto)
             if (d.observacion_incidencia !== 'Descanso' && d.observacion_incidencia !== 'Falta') {
                  totales[id].conteoDias += 1;
             }
         });
 
-        // Convertir los segundos totales de vuelta a formato H:MM:SS
         for (const id in totales) {
             totales[id].totalHorasTotales = segundosADuracion(totales[id].totalHorasSegundos);
             totales[id].totalHorasEsperadas = segundosADuracion(totales[id].totalEsperadasSegundos);
@@ -154,7 +131,6 @@ document.addEventListener("DOMContentLoaded", function () {
             return nombre.includes(busqueda) || id.includes(busqueda);
         });
         
-        // Ordenar datosFiltrados por ID de empleado para que los totales se inserten en orden
         datosFiltrados.sort((a, b) => (a.employee > b.employee) ? 1 : ((b.employee > a.employee) ? -1 : 0));
         
         const datosRetardos = datosFiltrados.filter(item => 
@@ -193,15 +169,13 @@ document.addEventListener("DOMContentLoaded", function () {
         detalleHeader.innerHTML = `<tr>${headersHTML}</tr>`;
 
         let empleadoActual = null;
-        // Número de columnas que ocuparán los campos vacíos en la fila de totales (Checadas + Observaciones)
         const totalChecadasColspan = maxChecadas + 1; 
         
         datos.forEach(d => {
-            // Si el empleado cambia, insertamos la fila de Totales del empleado anterior
             if (empleadoActual !== null && empleadoActual !== d.employee) {
                 const total = totalesEmpleados[empleadoActual];
                 const trTotal = document.createElement("tr");
-                trTotal.className = 'fila-totales'; // Clase para darle estilo (como un fondo gris)
+                trTotal.className = 'fila-totales';
                 trTotal.innerHTML = `
                     <td colspan="1">${empleadoActual}</td>
                     <td colspan="1">${total.Nombre}</td>
@@ -215,52 +189,56 @@ document.addEventListener("DOMContentLoaded", function () {
                 detalleBody.appendChild(trTotal);
             }
             
-            // Pintar la fila de datos del día
             const tr = document.createElement("tr");
             const observacion = d.observacion_incidencia || 'OK';
             
-            // --- INICIA REEMPLAZO ---
-            switch (observacion) {
-                // --- Casos de la leyenda ---
-                case 'OK': 
-                    tr.className = 'fila-ok'; // Asigna la clase para Verde Brillante
-                    break;
-                case 'Retardo Normal': 
-                    tr.className = 'fila-retardo-normal'; // Asigna la clase para Amarillo Brillante
-                    break;
-                case 'Falta': 
-                    tr.className = 'fila-falta'; // Rojo Brillante
-                    break;
-                case 'Descanso': 
-                    tr.className = 'fila-descanso'; // Morado Pálido
-                    break;
-                case 'Permiso': 
-                    tr.className = 'fila-permiso'; // Asigna la clase para Verde Pálido
-                    break;
+            // --- AQUÍ ESTÁ LA LÓGICA DE COLORES CORREGIDA ---
+            switch (observacion) {
+                case 'OK': 
+                    tr.className = 'fila-ok'; 
+                    break;
+                case 'Retardo Normal': 
+                    tr.className = 'fila-retardo-normal'; 
+                    break;
+                case 'Falta': 
+                    tr.className = 'fila-falta'; 
+                    break;
+                case 'Descanso': 
+                    tr.className = 'fila-descanso'; 
+                    break;
+                
+                // NUEVO: Caso para Festivos
+                case 'Festivo':
+                case 'Día Festivo':
+                    tr.className = 'fila-festivo'; 
+                    break;
 
-                // --- Casos que no están en la leyenda ---
-                case 'Retardo Mayor': 
-                    tr.className = 'fila-retardo-mayor'; 
-                    break;
-                case 'Salida Anticipada': 
-                    tr.className = 'fila-salida-anticipada'; 
-                    break;
-                case 'Cumplió con horas': 
-                    tr.className = 'fila-retardo-cumplido'; 
-                    break;
-            }
-            // --- TERMINA REEMPLAZO ---
+                case 'Permiso': 
+                    tr.className = 'fila-permiso'; 
+                    break;
+                case 'Retardo Mayor': 
+                    tr.className = 'fila-retardo-mayor'; 
+                    break;
+                case 'Salida Anticipada': 
+                    tr.className = 'fila-salida-anticipada'; 
+                    break;
+                case 'Cumplió con horas': 
+                    tr.className = 'fila-retardo-cumplido'; 
+                    break;
+                default:
+                    // Si contiene la palabra "Festivo" aunque no sea exacta
+                    if (observacion.includes('Festivo')) {
+                        tr.className = 'fila-festivo';
+                    }
+                    break;
+            }
 
-            // CORRECCIÓN: Manejar la visualización de Horas Esperadas (para evitar NaN:NaN:NaN)
             let horasEsperadasDisplay = d.horas_esperadas || '00:00:00';
             if (!isNaN(Number(d.horas_esperadas)) && Number(d.horas_esperadas) > 0) {
-                 // Si es un número (segundos), lo formateamos a H:MM:SS
                 horasEsperadasDisplay = segundosADuracion(d.horas_esperadas);
             } else if (d.horas_esperadas && d.horas_esperadas.includes(':')) {
-                 // Si es un string 'H:MM:SS', lo dejamos
                 horasEsperadasDisplay = d.horas_esperadas;
             } else {
-                // Si viene como NaN:NaN:NaN o algo extraño, lo mostramos vacío.
                 horasEsperadasDisplay = '-'; 
             }
             
@@ -273,7 +251,6 @@ document.addEventListener("DOMContentLoaded", function () {
             empleadoActual = d.employee;
         });
 
-        // Insertar la fila de Totales para el ÚLTIMO empleado
         if (empleadoActual !== null) {
             const total = totalesEmpleados[empleadoActual];
             const trTotal = document.createElement("tr");
@@ -292,11 +269,7 @@ document.addEventListener("DOMContentLoaded", function () {
         }
     }
     
-    // ==========================================================
-    // RESTO DE FUNCIONES (SIN CAMBIOS)
-    // ==========================================================
-
-function pintarTablaRetardos(datos) {
+    function pintarTablaRetardos(datos) {
         retardosBody.innerHTML = "";
         if (datos.length === 0) {
             retardosBody.innerHTML = '<tr><td colspan="8" style="text-align:center;">No hay retardos.</td></tr>';
@@ -304,19 +277,13 @@ function pintarTablaRetardos(datos) {
         }
         datos.forEach(d => {
             const tr = document.createElement("tr");
-
-            // --- INICIA CORRECCIÓN ---
-            // Asignar la clase de color correcta según la leyenda
             const observacion = d.observacion_incidencia || '';
 
             if (observacion === 'Retardo Normal') {
-                // Amarillo Brillante (según tu leyenda y CSS)
                 tr.className = 'fila-retardo-normal'; 
             } else if (observacion === 'Retardo Mayor') {
-                // Rojo Brillante (según tu leyenda: "Retardo con Descuento o Falta")
                 tr.className = 'fila-falta'; 
             }
-            // --- FIN CORRECCIÓN ---
 
             tr.innerHTML = `<td>${d.employee||''}</td><td>${d.Nombre||''}</td><td>${d.Sucursal||'N/A'}</td><td>${d.dia||''}</td><td>${d.dia_semana||''}</td><td>${d.horario_entrada||'-'}</td><td>${d.checado_primero||'-'}</td><td>${d.observacion_incidencia}</td>`;
             retardosBody.appendChild(tr);
@@ -373,7 +340,6 @@ function pintarTablaRetardos(datos) {
         }
         const headers = Array.from(tableHeader.querySelectorAll('th')).map(th => th.textContent);
         
-        // Excluir filas de Totales de la exportación
         const filasDatos = Array.from(filas);
 
         const datos = [headers];
@@ -441,16 +407,17 @@ function pintarTablaRetardos(datos) {
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF({ orientation: 'landscape' });
         
+        // --- MAPA DE COLORES ACTUALIZADO ---
         const colorMap = {
-            'fila-retardo-normal': [255, 255, 0],   // Amarillo #FFFF00
-            'fila-falta':          [255, 0, 0],     // Rojo #FF0000
+            'fila-retardo-normal': [255, 255, 0],   // Amarillo
+            'fila-falta':          [255, 0, 0],     // Rojo
             'fila-retardo-mayor':  [255, 0, 0],     // Rojo
-            'fila-permiso':        [146, 208, 80],  // Verde #92D050
-            'fila-txt-extra':      [0, 176, 240],   // Azul #00B0F0
-            'fila-tomo-txt':       [56, 87, 35],    // Verde Oscuro #385723
-            'fila-descanso':       [112, 48, 160],  // Morado #7030A0
-            'fila-festivo':        [66, 0, 125],    // Violeta #42007D
-            'fila-totales':        [221, 235, 247]  // Gris Azulado #DDEBF7
+            'fila-permiso':        [146, 208, 80],  // Verde
+            'fila-txt-extra':      [0, 176, 240],   // Azul
+            'fila-tomo-txt':       [56, 87, 35],    // Verde Oscuro
+            'fila-descanso':       [112, 48, 160],  // Morado Oscuro
+            'fila-festivo':        [142, 68, 173],  // Morado CORRECTO (#8E44AD)
+            'fila-totales':        [221, 235, 247]  // Gris Azulado
         };
 
         doc.autoTable({
@@ -464,7 +431,9 @@ function pintarTablaRetardos(datos) {
                     const cssClass = data.colores[hookData.row.index];
                     if (cssClass && colorMap[cssClass]) {
                         hookData.cell.styles.fillColor = colorMap[cssClass];
-                        if (cssClass === 'fila-descanso') {
+                        
+                        // --- AQUÍ HACEMOS QUE EL TEXTO SEA BLANCO EN FESTIVOS Y DESCANSOS ---
+                        if (cssClass === 'fila-descanso' || cssClass === 'fila-festivo') {
                             hookData.cell.styles.textColor = [255, 255, 255];
                         }
                     }
@@ -479,16 +448,14 @@ function pintarTablaRetardos(datos) {
         doc.save(`${nombreArchivo}_${tabActiva.replace('tab', '').toLowerCase()}.pdf`);
     }
 
-   // --- CONFIGURACIÓN INICIAL ---
     if (buscarEmpleado) {
         buscarEmpleado.addEventListener("input", filtrarYRenderizar);
     }
-    // 2. Activar cambios en fechas y sucursal
+    
     [fechaInicio, fechaFin, sucursalSelect].forEach(el => {
         if (el) el.addEventListener("change", cargarDatos);
     });
 
-    // 3. Activar Tabs y Botones
     if (tabDetalle) tabDetalle.addEventListener("click", switchTab);
     if (tabRetardos) tabRetardos.addEventListener("click", switchTab);
     
@@ -499,7 +466,6 @@ function pintarTablaRetardos(datos) {
     const oneMonthAgo = new Date(); 
     oneMonthAgo.setMonth(today.getMonth() - 1);
     
-    // Ajuste para zona horaria local (evita que salga un día antes)
     const formatDate = (date) => {
         const d = new Date(date);
         d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
@@ -509,14 +475,11 @@ function pintarTablaRetardos(datos) {
     if(fechaInicio) fechaInicio.value = formatDate(oneMonthAgo);
     if(fechaFin) fechaFin.value = formatDate(today);
     
-    // --- AQUÍ ESTÁ LO QUE PEDISTE (SUCURSAL) ---
     if(sucursalSelect) {
-        sucursalSelect.value = "Todas"; // Selecciona "Todas las Sucursales"
+        sucursalSelect.value = "Todas"; 
     }
     
     if(tabDetalle) tabDetalle.click();
 
-    // --- EJECUTAR CARGA AUTOMÁTICA ---
-    // Es necesario llamar a esta función al final para que busque los datos
     cargarDatos();
 });

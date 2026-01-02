@@ -481,7 +481,7 @@ def exportar_excel_con_colores(request):
             'fila-descanso': '7030A0',
             
             # Violeta Oscuro (Festivos) - Imagen 2
-            'fila-festivo': '42007D',
+            'fila-festivo': '8E44AD',
             
             # Azul Cyan (TxT generado / Dia Extra) - Imagen 2 y 3
             'fila-txt-extra': '00B0F0',

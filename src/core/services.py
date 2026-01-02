@@ -24,6 +24,7 @@ from .utils import td_to_str
 from .db_postgres_connection import obtener_horario_empleado_completo
 import numpy as np
 from django.shortcuts import get_object_or_404
+import holidays
 
 def autenticar_usuario(request, email, password):
     try:
@@ -355,7 +356,6 @@ class AttendanceProcessor:
         final_df['Sucursal'] = final_df.groupby('employee')['Sucursal'].ffill().bfill()
         final_df['Sucursal'] = final_df['Sucursal'].fillna('Sin Asignar')
 
-        # CRUCIAL: Solo mapear empleados ACTIVOS para los reportes
         empleados_activos_qs = Empleado.objects.filter(codigo_frappe__in=all_employees)
         emp_map = {str(e.codigo_frappe): f"{e.nombre} {e.apellido_paterno}" for e in empleados_activos_qs}
         
@@ -379,10 +379,8 @@ class AttendanceProcessor:
         start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
         
         try:
-             # Llama a tu función de conexión a la DB
              horarios_periodo = {e: obtener_horario_empleado_completo(e, start_date.strftime('%Y-%m-%d')) for e in employees_to_fetch}
         except NameError:
-             # Si el import de db_postgres_connection falla, usa un diccionario vacío
              horarios_periodo = {}
         
         for idx, row in df.iterrows():
@@ -399,6 +397,35 @@ class AttendanceProcessor:
                 df.at[idx, 'horario_salida'] = dia_horario.get('salida')
         return df
 
+    # --- NUEVA FUNCIÓN: IDENTIFICAR FESTIVOS AUTOMÁTICAMENTE ---
+    def identificar_festivos(self, df: pd.DataFrame) -> pd.DataFrame:
+        df['es_festivo'] = False
+        if df.empty: return df
+        
+        # Intentamos usar la librería holidays
+        try:
+            mx_holidays = holidays.Mexico()
+            # Si quieres agregar festivos personalizados de tu empresa:
+            # mx_holidays.append({"2025-05-10": "Día de las Madres"})
+            
+            def checar_festivo(fecha):
+                return fecha in mx_holidays
+
+            df['es_festivo'] = df['dia'].apply(checar_festivo)
+            
+        except Exception as e:
+            # Si falla la librería (o no se instaló), usamos una lista manual de respaldo
+            print(f"[ADVERTENCIA] No se pudo usar 'holidays': {e}. Usando lista manual.")
+            festivos_manuales = [
+                date(2025, 1, 1), date(2025, 2, 5), date(2025, 3, 17),
+                date(2025, 5, 1), date(2025, 9, 16), date(2025, 11, 17),
+                date(2025, 12, 25)
+            ]
+            df['es_festivo'] = df['dia'].isin(festivos_manuales)
+
+        return df
+    # -----------------------------------------------------------
+
     def aplicar_permisos_detallados(self, df: pd.DataFrame, permisos_dict: dict) -> pd.DataFrame:
         df['horas_permiso'] = pd.Timedelta(0); df['tiene_permiso'] = False
         if df.empty or not permisos_dict: return df
@@ -414,7 +441,15 @@ class AttendanceProcessor:
 
     def analizar_incidencias(self, df: pd.DataFrame) -> pd.DataFrame:
         df['falta'] = 0; df['retardo'] = 0; df['salida_anticipada'] = 0
+        
+        # Aseguramos que la columna exista
+        if 'es_festivo' not in df.columns: df['es_festivo'] = False
+
         for idx, row in df.iterrows():
+            # CORRECCIÓN IMPORTANTE: Si es festivo, NO calculamos incidencias numéricas (falta=0)
+            if row['es_festivo']: 
+                continue 
+
             if row['horas_esperadas'].total_seconds() > 0 and not row['tiene_permiso']:
                 if row['checados_count'] == 0:
                     df.at[idx, 'falta'] = 1; continue 
@@ -478,42 +513,27 @@ class AttendanceProcessor:
         descansos_calculados = []
 
         for (empleado, dia), grupo in grupos:
-            checadas_ordenadas = grupo.sort_values('time')['time'].tolist()
+            checadas_raw = grupo.sort_values('time')['time'].tolist()
+            checadas_limpias = []
+            if checadas_raw:
+                checadas_limpias.append(checadas_raw[0])
+                for t in checadas_raw[1:]:
+                    diff_seconds = (t - checadas_limpias[-1]).total_seconds()
+                    if diff_seconds > 120:
+                        checadas_limpias.append(t)
+
             total_descanso_dia = timedelta(0)
-            if len(checadas_ordenadas) >= 4:
-                for i in range(1, len(checadas_ordenadas) - 1, 2):
-                    salida_descanso = checadas_ordenadas[i]
-                    entrada_descanso = checadas_ordenadas[i+1]
-                    total_descanso_dia += (entrada_descanso - salida_descanso)
+            if len(checadas_limpias) >= 4:
+                for i in range(1, len(checadas_limpias) - 1, 2):
+                    salida_descanso = checadas_limpias[i]
+                    entrada_descanso = checadas_limpias[i+1]
+                    if entrada_descanso > salida_descanso:
+                        duracion = entrada_descanso - salida_descanso
+                        total_descanso_dia += duracion
             
             descansos_calculados.append({'employee': empleado, 'dia': dia, 'horas_descanso': total_descanso_dia})
+            
         return pd.DataFrame(descansos_calculados)
-
-    def procesar_reporte_completo(self, checkin_data, permisos_dict, start_date, end_date, employee_codes=None):
-        df_checadas_original = pd.DataFrame(checkin_data) if checkin_data else pd.DataFrame()
-        if not df_checadas_original.empty and 'time' in df_checadas_original.columns:
-            df_checadas_original['time'] = pd.to_datetime(df_checadas_original['time'])
-            df_checadas_original['dia'] = df_checadas_original['time'].dt.date
-
-        df_detalle = self.process_checkins_to_dataframe(checkin_data, start_date, end_date, employee_codes)
-        if df_detalle.empty: return pd.DataFrame(), pd.DataFrame()
-        
-        df_detalle = self.analizar_asistencia_con_horarios(df_detalle, start_date, end_date)
-        df_detalle = self.aplicar_permisos_detallados(df_detalle, permisos_dict)
-        
-        df_descansos = self.calcular_descanso_real_detallado(df_checadas_original)
-        
-        if not df_descansos.empty:
-            df_descansos['dia'] = pd.to_datetime(df_descansos['dia']).dt.date
-            df_detalle = pd.merge(df_detalle, df_descansos, on=['employee', 'dia'], how='left')
-            df_detalle['horas_descanso'] = df_detalle['horas_descanso'].fillna(pd.Timedelta(0))
-        else:
-            df_detalle['horas_descanso'] = pd.Timedelta(0)
-
-        df_detalle = self.analizar_incidencias(df_detalle)
-        df_resumen = self.calcular_resumen_final(df_detalle)
-        
-        return df_detalle, df_resumen
 
     def pivot_checkins(self, df_checadas: pd.DataFrame) -> pd.DataFrame:
         if df_checadas.empty or 'time' not in df_checadas.columns: return pd.DataFrame()
@@ -530,20 +550,43 @@ class AttendanceProcessor:
         df_pivoted.rename(columns=rename_dict, inplace=True)
         return df_pivoted
 
+    # --- ESTA ES LA FUNCIÓN CLAVE PARA LAS ETIQUETAS ---
     def determinar_observaciones(self, df: pd.DataFrame) -> pd.DataFrame:
         df_copy = df.copy()
         
         first_check = pd.to_datetime(df_copy['checado_primero'].astype(str), errors='coerce', format='%H:%M:%S')
         entry_schedule = pd.to_datetime(df_copy['horario_entrada'].astype(str), errors='coerce', format='%H:%M:%S')
 
+        if 'es_festivo' not in df_copy.columns: df_copy['es_festivo'] = False
+
         conditions = [
-            df_copy['falta'] == 1, (first_check - entry_schedule).dt.total_seconds() > (30 * 60), 
-            df_copy['salida_anticipada'] == 1, df_copy['retardo'] == 1, df_copy['tiene_permiso'] == True, 
+            # 1. PRIORIDAD ABSOLUTA: Si es festivo, se marca como tal.
+            # Al estar PRIMERO en la lista, gana sobre 'Falta'.
+            df_copy['es_festivo'] == True, 
+            
+            # 2. Si no es festivo, checamos faltas
+            df_copy['falta'] == 1, 
+            
+            # 3. Resto de condiciones
+            (first_check - entry_schedule).dt.total_seconds() > (30 * 60), 
+            df_copy['salida_anticipada'] == 1, 
+            df_copy['retardo'] == 1, 
+            df_copy['tiene_permiso'] == True, 
             (df_copy['horas_esperadas'].dt.total_seconds() == 0) & (df_copy['checados_count'] == 0), 
             (df_copy['retardo'] == 1) & (df_copy['duration'] >= df_copy['horas_esperadas']), 
         ]
         
-        choices = ['Falta', 'Retardo Mayor', 'Salida Anticipada', 'Retardo Normal', 'Permiso', 'Descanso', 'Cumplió con horas']
+        # EL ORDEN AQUÍ DEBE COINCIDIR CON EL ORDEN DE ARRIBA
+        choices = [
+            'Festivo',         # Corresponde a es_festivo == True
+            'Falta',           # Corresponde a falta == 1
+            'Retardo Mayor', 
+            'Salida Anticipada', 
+            'Retardo Normal', 
+            'Permiso', 
+            'Descanso', 
+            'Cumplió con horas'
+        ]
         
         df_copy['observacion_incidencia'] = np.select(conditions, choices, default='OK')
         return df_copy
@@ -558,6 +601,11 @@ class AttendanceProcessor:
         if df_detalle.empty: return pd.DataFrame()
 
         df_detalle = self.analizar_asistencia_con_horarios(df_detalle, start_date, end_date)
+        
+        # --- LLAMADA IMPORTANTE ---
+        df_detalle = self.identificar_festivos(df_detalle)
+        # --------------------------
+
         df_detalle = self.aplicar_permisos_detallados(df_detalle, permisos_dict)
         df_detalle = self.analizar_incidencias(df_detalle)
         
@@ -581,6 +629,38 @@ class AttendanceProcessor:
         df_detalle['dia'] = df_detalle['dia'].astype(str)
         df_detalle.fillna('-', inplace=True)
         return df_detalle
+
+    def procesar_reporte_completo(self, checkin_data, permisos_dict, start_date, end_date, employee_codes=None):
+        # Esta función también necesita los cambios para el resumen
+        df_checadas_original = pd.DataFrame(checkin_data) if checkin_data else pd.DataFrame()
+        if not df_checadas_original.empty and 'time' in df_checadas_original.columns:
+            df_checadas_original['time'] = pd.to_datetime(df_checadas_original['time'])
+            df_checadas_original['dia'] = df_checadas_original['time'].dt.date
+
+        df_detalle = self.process_checkins_to_dataframe(checkin_data, start_date, end_date, employee_codes)
+        if df_detalle.empty: return pd.DataFrame(), pd.DataFrame()
+        
+        df_detalle = self.analizar_asistencia_con_horarios(df_detalle, start_date, end_date)
+        
+        # --- LLAMADA IMPORTANTE PARA EL REPORTE COMPLETO ---
+        df_detalle = self.identificar_festivos(df_detalle)
+        # ---------------------------------------------------
+        
+        df_detalle = self.aplicar_permisos_detallados(df_detalle, permisos_dict)
+        
+        df_descansos = self.calcular_descanso_real_detallado(df_checadas_original)
+        
+        if not df_descansos.empty:
+            df_descansos['dia'] = pd.to_datetime(df_descansos['dia']).dt.date
+            df_detalle = pd.merge(df_detalle, df_descansos, on=['employee', 'dia'], how='left')
+            df_detalle['horas_descanso'] = df_detalle['horas_descanso'].fillna(pd.Timedelta(0))
+        else:
+            df_detalle['horas_descanso'] = pd.Timedelta(0)
+
+        df_detalle = self.analizar_incidencias(df_detalle)
+        df_resumen = self.calcular_resumen_final(df_detalle)
+        
+        return df_detalle, df_resumen
 
 # --- FUNCIONES PARA GRÁFICA GENERAL (USAN PANDAS) ---
 

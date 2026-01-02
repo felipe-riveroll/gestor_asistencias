@@ -22,3 +22,5 @@ PyYAML
 openpyxl
 numpy
 Pillow
+django-environ
+holidays

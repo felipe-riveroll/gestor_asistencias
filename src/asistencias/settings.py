@@ -12,6 +12,29 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 from pathlib import Path
 import os
+import environ
+
+# Initialize environment variables
+env = environ.Env(
+    # Set casting, default values
+    DEBUG=(bool, False),
+    SECRET_KEY=(str, ''),
+    ALLOWED_HOSTS=(list, ['localhost', '127.0.0.1']),
+    POSTGRES_DB=(str, 'asistencias'),
+    POSTGRES_USER=(str, 'postgres'),
+    POSTGRES_PASSWORD=(str, ''),
+    DB_HOST=(str, 'localhost'),
+    DB_PORT=(int, 5432),
+    EMAIL_HOST=(str, 'smtp.purelymail.com'),
+    EMAIL_PORT=(int, 465),
+    EMAIL_USE_SSL=(bool, True),
+    EMAIL_HOST_USER=(str, ''),
+    EMAIL_HOST_PASSWORD=(str, ''),
+    DEFAULT_FROM_EMAIL=(str, ''),
+)
+
+# Read .env file
+environ.Env.read_env(Path(__file__).resolve().parent.parent.parent / '.env')
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -21,12 +44,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-79tr_8tc%550a4x#6l1@#p*&(gpxep8!q+jgrnty3%^2@(dw5!'
+SECRET_KEY = env('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = env('DEBUG')
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = env('ALLOWED_HOSTS')
 
 # Application definition
 
@@ -78,20 +101,11 @@ import os
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        # Intenta leer del .env (Docker), si no hay nada, usa 'postgres' (Local)
-        'NAME': os.getenv('POSTGRES_DB', 'postgres'),
-        
-        # Intenta leer del .env, si no, usa 'postgres'
-        'USER': os.getenv('POSTGRES_USER', 'postgres'),
-        
-        # Intenta leer del .env, si no, usa tu contraseña local 'asiatech'
-        'PASSWORD': os.getenv('POSTGRES_PASSWORD', 'asiatech'),
-        
-        # ESTA ES LA CLAVE: Docker usa 'db', Local usa 'localhost'
-        'HOST': os.getenv('DB_HOST', 'localhost'),
-        
-        # Docker usa 5432, Local usa 5433
-        'PORT': os.getenv('DB_PORT', '5433'),
+        'NAME': env('POSTGRES_DB'),
+        'USER': env('POSTGRES_USER'),
+        'PASSWORD': env('POSTGRES_PASSWORD'),
+        'HOST': env('DB_HOST'),
+        'PORT': env('DB_PORT'),
     }
 }
 
@@ -145,24 +159,84 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
-EMAIL_HOST = "smtp.purelymail.com"
-EMAIL_PORT = 465
-EMAIL_USE_SSL = True   # <--- CAMBIA ESTO (Antes tenías USE_TLS)
+EMAIL_HOST = env('EMAIL_HOST')
+EMAIL_PORT = env('EMAIL_PORT')
+EMAIL_USE_SSL = env('EMAIL_USE_SSL')
 EMAIL_USE_TLS = False
-EMAIL_HOST_USER = "asistencias@asiatech.com.mx" #MODIFICAR POR CORREO DE LA EMPRESA Y CON VARIABLES DE ENTORNO
-EMAIL_HOST_PASSWORD = "ufwyyrttvezcubxmtwqg" #MODIFICAR POR CORREO DE LA EMPRESA Y CON VARIABLES DE ENTORNO
-DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
+EMAIL_HOST_USER = env('EMAIL_HOST_USER')
+EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD')
+DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL') or EMAIL_HOST_USER
 
-ALLOWED_HOSTS = ["*"]  # Importante para Docker
+# ALLOWED_HOSTS ya está configurado arriba con env('ALLOWED_HOSTS')
 
 CSRF_TRUSTED_ORIGINS = [
     "http://localhost",
     "http://localhost:8000",
     "http://127.0.0.1",
     "http://127.0.0.1:8000",
+    "https://asistencias.asiatech.com.mx",
+    "http://asistencias.asiatech.com.mx",
 ]
 
 # Corrección de rutas de Login
 LOGIN_URL = '/login/'
 LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = '/login/'
+
+# Validación de seguridad crítica
+import warnings
+
+if not SECRET_KEY or 'django-insecure-79tr' in SECRET_KEY:
+    raise ValueError(
+        "SECRET_KEY no configurado o usando valor de desarrollo. "
+        "Por favor configure una SECRET_KEY única y segura en el archivo .env\n"
+        "Para generar una nueva clave: python -c "
+        "\"from django.core.management.utils import get_random_secret_key; "
+        "print(get_random_secret_key())\""
+    )
+
+# Advertencias de seguridad
+class SecurityWarning(UserWarning):
+    """Advertencia para configuraciones de seguridad"""
+    pass
+
+# Configurar ENVIRONMENT si no está definido
+ENVIRONMENT = env('ENVIRONMENT', default='development')
+
+if ALLOWED_HOSTS == ['*']:
+    warnings.warn(
+        "ALLOWED_HOSTS=['*'] es una vulnerabilidad de seguridad. "
+        "Por favor especifique los hosts permitidos explícitamente.",
+        SecurityWarning,
+        stacklevel=2
+    )
+
+if DEBUG and ENVIRONMENT == 'production':
+    warnings.warn(
+        "DEBUG=True en producción es una vulnerabilidad de seguridad. "
+        "Por favor configure DEBUG=False para entornos de producción.",
+        SecurityWarning,
+        stacklevel=2
+    )
+
+# Security headers
+SECURE_BROWSER_XSS_FILTER = True
+SECURE_CONTENT_TYPE_NOSNIFF = True
+X_FRAME_OPTIONS = 'DENY'
+
+# Considerar para producción con HTTPS:
+# SECURE_SSL_REDIRECT = True
+# SESSION_COOKIE_SECURE = True
+# CSRF_COOKIE_SECURE = True
+
+# Cookies seguras (solo en producción cuando se usa HTTPS)
+if not DEBUG:
+    # Deshabilitar redirección SSL ya que Caddy maneja HTTPS
+    SECURE_SSL_REDIRECT = False
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SESSION_COOKIE_HTTPONLY = True
+    CSRF_COOKIE_HTTPONLY = True
+
+ASIATECH_API_KEY = env('ASIATECH_API_KEY', default='')
+ASIATECH_API_SECRET = env('ASIATECH_API_SECRET', default='')

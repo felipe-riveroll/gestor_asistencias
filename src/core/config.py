@@ -70,15 +70,6 @@ UMBRAL_FALTA_INJUSTIFICADA_MINUTOS = 60
 GRACE_MINUTES = 59
 
 # ==============================================================================
-# REPORT CONFIGURATION
-# ==============================================================================
-
-# Output file names
-OUTPUT_DETAILED_REPORT = "reporte_asistencia_analizado.csv"
-OUTPUT_SUMMARY_REPORT = "resumen_periodo.csv" 
-OUTPUT_HTML_DASHBOARD = "dashboard_asistencia.html"
-
-# ==============================================================================
 # SPANISH DAY NAMES MAPPING
 # ==============================================================================
 
