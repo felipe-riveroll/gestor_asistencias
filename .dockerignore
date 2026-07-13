@@ -1,6 +1,42 @@
-# Contenido de .dockerignore
+# Control de contexto de build Docker
+# IMPORTANTE: NO excluir *.sh (entrypoint.sh es necesario en la imagen)
 
 .git
+.gitignore
 .venv
+venv/
+env/
+
+# Caché de Python
 __pycache__/
-# *.sh  <-- Comenta o elimina esta líneaexit
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+.pytest_cache/
+
+# Secretos: nunca dentro de la imagen
+.env
+.env.*
+
+# Editor / agente / docs no requeridos por la app
+.cruh.json
+opencode.json
+*.md
+.serena/
+.vscode/
+.idea/
+.DS_Store
+
+# Scripts de validación/despliegue (no se usan en runtime)
+scripts/
+
+# Generados en runtime vía volumen
+src/staticfiles/
+src/media/
+
+# Docker files
+Dockerfile
+.dockerignore
+docker-compose*.yml
+compose*.yml

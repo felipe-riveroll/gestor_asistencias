@@ -3,8 +3,9 @@ services:
   web:
     build: .
     container_name: asistencias_web
-    command: >
-      sh -c "python manage.py collectstatic --noinput && gunicorn asistencias.wsgi:application --bind 0.0.0.0:8000 --workers=3 --worker-class=gthread --threads=4 --timeout 300"
+    # El ENTRYPOINT del Dockerfile (entrypoint.sh) aplica migraciones y collectstatic,
+    # luego exec "$@" ejecuta este comando (gunicorn) conservando el timeout de 300s.
+    command: ["gunicorn", "asistencias.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3", "--worker-class", "gthread", "--threads", "4", "--timeout", "300"]
     volumes:
       - ./src:/app
       - ./src/static:/app/static
@@ -12,6 +13,13 @@ services:
       - ./src/media:/app/media
     env_file:
       - .env
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8000/health/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
     depends_on:
       db:
         condition: service_healthy
@@ -27,8 +35,17 @@ services:
       - ./src/static:/app/static
       - ./src/staticfiles:/app/staticfiles
       - ./src/media:/app/media
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1/health/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      start_period: 30s
+      retries: 3
     depends_on:
-      - web
+      web:
+        condition: service_healthy
+        restart: true
 
   db:
     image: postgres:17
@@ -41,6 +58,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
       - "5432:5432"
+    restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 10s
@@ -49,5 +67,3 @@ services:
 
 volumes:
   db_data:
-  static_volume:
-  media_volume:
