@@ -78,6 +78,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         }
                     }
                 }
+                if (cookieValue === null) { const m = document.querySelector('meta[name="csrf-token"]'); if (m) cookieValue = m.getAttribute('content'); }
                 return cookieValue;
             }
             const csrftoken = getCookie('csrftoken');

@@ -686,5 +686,6 @@ function getCookie(name) {
             }
         }
     }
+    if (cookieValue === null) { const m = document.querySelector('meta[name="csrf-token"]'); if (m) cookieValue = m.getAttribute('content'); }
     return cookieValue;
 }
