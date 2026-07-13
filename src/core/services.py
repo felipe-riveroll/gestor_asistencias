@@ -12,6 +12,7 @@ from django.contrib.auth.models import User, Group
 from django.core.exceptions import ValidationError
 from django.core.mail import send_mail
 from django.conf import settings
+from django.db import transaction
 
 # Imports de tus propios archivos de la aplicación
 from .models import Empleado, AsignacionHorario, Sucursal, Horario, DiaSemana
@@ -147,9 +148,21 @@ def crear_horario_service(data):
 # === FUNCIONES DE GESTIÓN DE ROLES (USAN Empleado.objects para activos) ===
 # =================================================================
 
-def asignar_rol_service(data):
-    """Asigna/edita roles de Administrador/Manager a un Empleado activo."""
-    admin_id = data.get("adminId") 
+def asignar_rol_service(data, actor=None):
+    """Asigna/edita roles de Administrador/Manager a un Empleado activo.
+
+    Requiere que el `actor` sea Admin (grupo "Admin" o superuser). Verificación
+    de defensa en profundidad: la vista filtra con @group_required("Admin"), pero
+    el servicio es la última trinchera frente a cualquier otro caller.
+    """
+    if not (
+        actor
+        and getattr(actor, "is_authenticated", False)
+        and (actor.is_superuser or actor.groups.filter(name="Admin").exists())
+    ):
+        return {"error": "No tienes permisos para realizar esta acción."}
+
+    admin_id = data.get("adminId")
     nombre = data.get("firstName")
     apellido = data.get("firstLastName")
     correo = data.get("email")
@@ -814,28 +827,98 @@ def actualizar_datos_basicos_empleado_service(empleado_id, data):
     return empleado
 
 def actualizar_horarios_empleado_service(empleado_id, data):
-    """Borra y recrea las asignaciones de horario para un empleado activo."""
-    from django.core.exceptions import ValidationError
-    
+    """Borra y recrea las asignaciones de horario para un empleado activo.
+
+    Valida TODO antes de mutar (paridad de listas, existencia de cada FK) y
+    ejecuta el borrado + creación dentro de `transaction.atomic()`, de modo que
+    cualquier fallo revierta las asignaciones previas en lugar de dejar al
+    empleado sin horario.
+    """
+    sucursales = data.getlist("sucursales[]")
+    horarios = data.getlist("horarios[]")
+    dias = data.getlist("dias[]")
+
+    # 1) Paridad: si llega cualquiera de las listas, las tres deben tener el mismo largo.
+    if sucursales or horarios or dias:
+        if not (len(sucursales) == len(horarios) == len(dias)):
+            raise ValidationError(
+                "Las listas sucursales[], horarios[] y dias[] deben tener el mismo largo."
+            )
+
     try:
-        empleado = get_object_or_404(Empleado.objects, pk=empleado_id) # Usa objects para buscar activo
+        empleado = get_object_or_404(Empleado.objects, pk=empleado_id)  # activo
 
-        AsignacionHorario.objects.filter(empleado=empleado).delete()
-        
-        sucursales = data.getlist("sucursales[]"); horarios = data.getlist("horarios[]"); dias = data.getlist("dias[]")
-        if not sucursales: return empleado 
+        # Caso: sin horarios nuevos -> sólo se borran los existentes (atómico).
+        if not sucursales:
+            with transaction.atomic():
+                AsignacionHorario.objects.filter(empleado=empleado).delete()
+            return empleado
 
+        # 2) Coerción segura de IDs.
+        try:
+            sucursal_ids = [int(s) for s in sucursales]
+            horario_ids = [int(h) for h in horarios]
+        except (TypeError, ValueError):
+            raise ValidationError("Los IDs de sucursal/horario deben ser enteros válidos.")
+
+        # 3) Resolución en bloque de los Horario ANTES de mutar (sin .get dentro del loop).
+        horarios_map = Horario.objects.filter(pk__in=horario_ids).in_bulk()
+        faltantes = [hid for hid in horario_ids if hid not in horarios_map]
+        if faltantes:
+            raise ValidationError(f"Horarios inexistentes: {faltantes}")
+
+        # 4) Validar sucursales referenciadas.
+        sucursales_existentes = set(
+            Sucursal.objects.filter(pk__in=sucursal_ids).values_list("pk", flat=True)
+        )
+        sucursales_invalidas = set(sucursal_ids) - sucursales_existentes
+        if sucursales_invalidas:
+            raise ValidationError(f"Sucursales inexistentes: {sorted(sucursales_invalidas)}")
+
+        # 5) Parsear días de cada fila y validarlos en bloque.
+        filas = []  # (sucursal_id, horario_obj, [dia_id, ...])
+        todos_dias = set()
         for sucursal_id, horario_id, dias_str in zip(sucursales, horarios, dias):
-            dias_list = dias_str.split(",")
-            for dia in dias_list:
-                horario_obj = Horario.objects.get(pk=int(horario_id))
-                AsignacionHorario.objects.create(
-                    empleado=empleado, sucursal_id=int(sucursal_id), horario=horario_obj,
-                    dia_especifico_id=int(dia), hora_entrada_especifica=horario_obj.hora_entrada,
+            tokens = [t.strip() for t in dias_str.split(",") if t.strip()]
+            if not tokens:
+                raise ValidationError("Cada fila debe indicar al menos un día.")
+            try:
+                dia_ids = [int(t) for t in tokens]
+            except ValueError:
+                raise ValidationError("Los IDs de día deben ser enteros válidos.")
+            filas.append((int(sucursal_id), horarios_map[int(horario_id)], dia_ids))
+            todos_dias.update(dia_ids)
+
+        if todos_dias:
+            dias_existentes = set(
+                DiaSemana.objects.filter(pk__in=todos_dias).values_list("pk", flat=True)
+            )
+            dias_invalidos = todos_dias - dias_existentes
+            if dias_invalidos:
+                raise ValidationError(f"Días inexistentes: {sorted(dias_invalidos)}")
+
+        # 6) Mutar: borrar + crear dentro de la transacción.
+        with transaction.atomic():
+            AsignacionHorario.objects.filter(empleado=empleado).delete()
+            nuevas = [
+                AsignacionHorario(
+                    empleado=empleado,
+                    sucursal_id=sucursal_id,
+                    horario=horario_obj,
+                    dia_especifico_id=dia,
+                    hora_entrada_especifica=horario_obj.hora_entrada,
                     hora_salida_especifica=horario_obj.hora_salida,
                     hora_salida_especifica_cruza_medianoche=horario_obj.cruza_medianoche,
                 )
+                for sucursal_id, horario_obj, dias_fila in filas
+                for dia in dias_fila
+            ]
+            if nuevas:
+                AsignacionHorario.objects.bulk_create(nuevas)
+
         return empleado
 
+    except ValidationError:
+        raise
     except Exception as e:
         raise ValidationError(f"Error al guardar horarios: {e}")

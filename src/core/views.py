@@ -35,6 +35,7 @@ from .services import (
     actualizar_datos_basicos_empleado_service # Si se usa en otra vista
 )
 from .models import Sucursal, Horario, Empleado, AsignacionHorario, DiaSemana
+from .decorators import group_required
 from .main import generar_reporte_completo, generar_reporte_detalle_completo, generar_datos_dashboard_general,generar_datos_dashboard_31pte,generar_datos_dashboard_villas,generar_datos_dashboard_nave
 from django.views.decorators.http import require_POST
 from django.views.decorators.csrf import csrf_protect
@@ -74,9 +75,10 @@ def login_view(request):
     return render(request, "login.html")
 
 @login_required
+@group_required("Admin")
 def admin_page(request, empleado_id=None):
     if request.method == "POST":
-        resultado = asignar_rol_service(request.POST)
+        resultado = asignar_rol_service(request.POST, request.user)
         if "error" in resultado:
             messages.error(request, resultado["error"])
         else:
@@ -95,6 +97,7 @@ def admin_page(request, empleado_id=None):
     )
 
 @login_required
+@group_required("Admin")
 def eliminar_admin(request, empleado_id):
     resultado = eliminar_admin_service(empleado_id)
 
@@ -341,6 +344,7 @@ def restaurar_empleado(request, empleado_id):
 # 12. RESTO DE VISTAS DE EDICIÓN Y API (Mantenemos tu código original)
 # =======================================================
 @login_required
+@group_required("Admin", "Manager")
 @require_http_methods(["POST"])
 def editar_empleado(request, empleado_id):
     try:
@@ -1037,13 +1041,21 @@ def get_horarios_empleado(request, empleado_id):
         return JsonResponse({"error": f"Error interno: {str(e)}"}, status=500)
 
 @login_required
+@group_required("Admin")
 @require_http_methods(["DELETE"])
 def api_eliminar_horario_flexible(request, horario_id):
     try:
         horario = Horario.objects.get(pk=horario_id)
+        # No confiar en on_delete=SET_NULL: si el horario está asignado a empleados,
+        # borrarlo pondría horario=NULL silenciosamente y corrompería su asistencia.
+        if AsignacionHorario.objects.filter(horario=horario).exists():
+            return JsonResponse(
+                {"error": "No se puede eliminar: el horario está asignado a empleados."},
+                status=409,
+            )
         horario.delete()
         return JsonResponse({"success": "Horario eliminado correctamente y lista limpia."}, status=200)
-    
+
     except Horario.DoesNotExist:
         return JsonResponse({"error": "Horario no encontrado."}, status=404)
     except Exception as e:
