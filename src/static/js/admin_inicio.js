@@ -65,23 +65,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
 
-            // Obtener CSRF Token
-            function getCookie(name) {
-                let cookieValue = null;
-                if (document.cookie && document.cookie !== '') {
-                    const cookies = document.cookie.split(';');
-                    for (let i = 0; i < cookies.length; i++) {
-                        const cookie = cookies[i].trim();
-                        if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                            cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                            break;
-                        }
-                    }
-                }
-                if (cookieValue === null) { const m = document.querySelector('meta[name="csrf-token"]'); if (m) cookieValue = m.getAttribute('content'); }
-                return cookieValue;
-            }
-            const csrftoken = getCookie('csrftoken');
+            // getCSRFToken() se define en static/js/csrf.js (cargado antes que este script).
+            const csrftoken = getCSRFToken();
 
             // Validar que la URL global exista (prevención de errores)
             if (typeof URL_CAMBIAR_PASSWORD === 'undefined') {

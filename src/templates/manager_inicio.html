@@ -4,6 +4,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="csrf-token" content="{{ csrf_token }}">
   <title>Reporte de Horas por Sucursal</title>
 
   <!-- Fuentes e íconos -->
@@ -205,6 +206,7 @@
     <script>
       const URL_CAMBIAR_PASSWORD = "{% url 'cambiar_password_usuario' %}";
     </script>
+    <script src="{% static 'js/csrf.js' %}"></script>
     <script src="{% static 'js/admin_inicio.js' %}"></script>
   <!-- Script personalizado -->
   <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>

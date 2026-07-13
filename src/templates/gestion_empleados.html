@@ -4,6 +4,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="csrf-token" content="{{ csrf_token }}">
     <title>Gestión de Empleados - Asiatech</title>
     <link rel="icon" href="{% static 'img/logo.png' %}" type="image/png">
     <link
@@ -655,6 +656,7 @@
 <script>
       const URL_CAMBIAR_PASSWORD = "{% url 'cambiar_password_usuario' %}";
     </script>
+    <script src="{% static 'js/csrf.js' %}"></script>
     <script src="{% static 'js/admin_inicio.js' %}"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {

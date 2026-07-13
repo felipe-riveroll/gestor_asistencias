@@ -273,9 +273,9 @@ if (scheduleDataForm) {
         // Creamos un nuevo FormData para evitar conflictos con el formulario original
         const finalFormData = new FormData();
         
-        // 1. Añadir el token CSRF (debe obtenerse del formulario)
-        const csrfToken = document.querySelector('#scheduleDataForm input[name="csrfmiddlewaretoken"]').value;
-        finalFormData.append('csrfmiddlewaretoken', csrfToken); 
+        // 1. Añadir el token CSRF (desde csrf.js: cookie o <meta name="csrf-token">)
+        const csrfToken = getCSRFToken();
+        finalFormData.append('csrfmiddlewaretoken', csrfToken);
         
         // 2. Añadir el ID del empleado
         finalFormData.append('empleado_id', employeeIdSchedule.value); 
@@ -304,6 +304,7 @@ if (scheduleDataForm) {
         try {
             const response = await fetch(form.action, {
                 method: 'POST',
+                headers: { 'X-CSRFToken': getCSRFToken() },
                 body: finalFormData,
             });
 
@@ -635,7 +636,7 @@ if (scheduleForm) {
 
 // 🟢 FUNCIÓN DE ELIMINACIÓN DE API (Añadir al final de gestion_empleados.js)
 async function eliminarHorario(horarioId) {
-    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    const csrfToken = getCSRFToken();
     
     try {
         const response = await fetch(`/api/horarios/eliminar/${horarioId}/`, {

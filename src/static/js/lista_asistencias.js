@@ -298,21 +298,7 @@ document.addEventListener("DOMContentLoaded", function () {
         document.getElementById(tabId.replace('tab', '')).style.display = 'block';
     }
     
-    function getCookie(name) {
-        let cookieValue = null;
-        if (document.cookie && document.cookie !== '') {
-            const cookies = document.cookie.split(';');
-            for (let i = 0; i < cookies.length; i++) {
-                const cookie = cookies[i].trim();
-                if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                    break;
-                }
-            }
-        }
-        if (cookieValue === null) { const m = document.querySelector('meta[name="csrf-token"]'); if (m) cookieValue = m.getAttribute('content'); }
-        return cookieValue;
-    }
+    // getCSRFToken() se define en static/js/csrf.js (cargado antes que este script).
 
     function exportarA(formato) {
         const nombreArchivoBase = 'reporte_asistencias';
@@ -374,7 +360,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
         fetch('/api/exportar_excel_con_colores/', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() },
             body: JSON.stringify(exportData)
         })
         .then(response => {

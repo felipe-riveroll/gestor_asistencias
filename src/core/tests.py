@@ -5,13 +5,16 @@ H1 — Escalada de privilegios en `admin_page` / `asignar_rol_service`.
 H2 — Edición de horario no atómica en `actualizar_horarios_empleado_service`.
 H3 — Borrado de horario sin autorización ni protección referencial.
 """
+import json
 from datetime import time
+from pathlib import Path
 
 import pandas as pd
+from django.conf import settings
 from django.contrib.auth.models import Group, User
 from django.core import mail
 from django.http import QueryDict
-from django.test import TestCase, override_settings
+from django.test import TestCase, Client, override_settings
 from django.urls import reverse
 
 from core.models import AsignacionHorario, DiaSemana, Empleado, Horario, Sucursal
@@ -344,3 +347,74 @@ class FestivosKpiTest(TestCase):
         df = proc.analizar_incidencias(df)
         resumen = proc.calcular_resumen_final(df)
         self.assertEqual(resumen.iloc[0]["total_horas_esperadas_td"], pd.Timedelta(hours=16))
+
+
+# --------------------------------------------------------------------------
+# Review adversarial (3ra ronda) — H1: meta CSRF en plantillas con admin_inicio.js
+#
+# CSRF_COOKIE_HTTPONLY=True hace que el JS no pueda leer la cookie `csrftoken`;
+# admin_inicio.js cae a <meta name="csrf-token">. Toda plantilla que cargue
+# admin_inicio.js DEBE declarar ese meta o el cambio de contraseña falla con 403.
+# --------------------------------------------------------------------------
+class CsrfMetaEnPlantillasTest(TestCase):
+    """Anti-recurrencia: scan de archivos de plantilla (no depende de vistas/API)."""
+
+    @property
+    def _templates_dir(self):
+        return Path(settings.BASE_DIR) / "templates"
+
+    def _plantillas_con_admin_inicio_js(self):
+        return {
+            p.name for p in self._templates_dir.glob("*.html")
+            if "admin_inicio.js" in p.read_text(encoding="utf-8")
+        }
+
+    def test_toda_plantilla_con_admin_inicio_js_tiene_meta_csrf(self):
+        con_js = self._plantillas_con_admin_inicio_js()
+        self.assertTrue(
+            con_js,
+            "No se encontraron plantillas que carguen admin_inicio.js; ¿cambiaron las plantillas?",
+        )
+        sin_meta = []
+        for nombre in sorted(con_js):
+            contenido = (self._templates_dir / nombre).read_text(encoding="utf-8")
+            if '<meta name="csrf-token"' not in contenido:
+                sin_meta.append(nombre)
+        self.assertEqual(
+            sin_meta, [],
+            f"Plantillas con admin_inicio.js SIN <meta name='csrf-token'> (el POST de "
+            f"cambio de contraseña daría 403): {sin_meta}",
+        )
+
+
+class CambiarPasswordCsrfTest(TestCase):
+    """H1: /api/cambiar-password/ debe aceptar 200 con token CSRF válido y
+    rechazar 403 sin él."""
+
+    def setUp(self):
+        self.admin = _admin()
+        self.url = reverse("cambiar_password_usuario")
+        self.payload = json.dumps(
+            {"newPassword": "nueva1234", "confirmPassword": "nueva1234"}
+        )
+
+    def test_post_sin_token_devuelve_403(self):
+        client = Client(enforce_csrf_checks=True)
+        client.force_login(self.admin)
+        resp = client.post(self.url, data=self.payload, content_type="application/json")
+        self.assertEqual(resp.status_code, 403)
+
+    def test_post_con_token_valido_devuelve_200(self):
+        client = Client(enforce_csrf_checks=True)
+        client.force_login(self.admin)
+        # Una vista con {% csrf_token %} emite la cookie csrftoken.
+        client.get(reverse("inicio"))
+        token = client.cookies["csrftoken"].value
+        resp = client.post(
+            self.url,
+            data=self.payload,
+            content_type="application/json",
+            HTTP_X_CSRFTOKEN=token,
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.json()["success"])

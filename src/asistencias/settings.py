@@ -235,20 +235,33 @@ USE_HTTPS = env('USE_HTTPS', default=False)
 def configuracion_cookies_seguras(debug: bool, use_https: bool) -> dict:
     """Devuelve la configuración de cookies/SSL coherente con la topología declarada.
 
-    Las cookies Secure y el redirect SSL sólo se activan cuando se declara TLS
-    (USE_HTTPS=True). Sobre HTTP puro las cookies no se marcan Secure. Extraída como
-    función pura para poder testear el invariante sin recargar el módulo de settings.
+    Las cookies Secure, el redirect SSL, SECURE_PROXY_SSL_HEADER y HSTS sólo se activan
+    cuando se declara TLS (USE_HTTPS=True). Sobre HTTP puro las cookies no se marcan
+    Secure. Extraída como función pura para poder testear el invariante sin recargar el
+    módulo de settings.
+
+    SECURE_PROXY_SSL_HEADER es seguro aquí porque el contenedor web (gunicorn :8000) no
+    se publica al host: el único camino a Django es el reverse proxy que termina TLS
+    (Caddy del host -> nginx del contenedor), que reenvía X-Forwarded-Proto.
     """
     if not debug and use_https:
         return {
             "SECURE_SSL_REDIRECT": True,
             "SESSION_COOKIE_SECURE": True,
             "CSRF_COOKIE_SECURE": True,
+            "SECURE_PROXY_SSL_HEADER": ("HTTP_X_FORWARDED_PROTO", "https"),
+            "SECURE_HSTS_SECONDS": 31536000,
+            "SECURE_HSTS_INCLUDE_SUBDOMAINS": True,
+            "SECURE_HSTS_PRELOAD": False,  # preload es irreversible; fuera por defecto
         }
     return {
         "SECURE_SSL_REDIRECT": False,
         "SESSION_COOKIE_SECURE": False,
         "CSRF_COOKIE_SECURE": False,
+        "SECURE_PROXY_SSL_HEADER": None,
+        "SECURE_HSTS_SECONDS": 0,
+        "SECURE_HSTS_INCLUDE_SUBDOMAINS": False,
+        "SECURE_HSTS_PRELOAD": False,
     }
 
 
@@ -256,8 +269,22 @@ _cookies = configuracion_cookies_seguras(DEBUG, USE_HTTPS)
 SECURE_SSL_REDIRECT = _cookies["SECURE_SSL_REDIRECT"]
 SESSION_COOKIE_SECURE = _cookies["SESSION_COOKIE_SECURE"]
 CSRF_COOKIE_SECURE = _cookies["CSRF_COOKIE_SECURE"]
+SECURE_PROXY_SSL_HEADER = _cookies["SECURE_PROXY_SSL_HEADER"]
+SECURE_HSTS_SECONDS = _cookies["SECURE_HSTS_SECONDS"]
+SECURE_HSTS_INCLUDE_SUBDOMAINS = _cookies["SECURE_HSTS_INCLUDE_SUBDOMAINS"]
+SECURE_HSTS_PRELOAD = _cookies["SECURE_HSTS_PRELOAD"]
 SESSION_COOKIE_HTTPONLY = True   # HTTPOnly es seguro incluso sobre HTTP
 CSRF_COOKIE_HTTPONLY = True
+
+# Advertencia operativa (no bloqueante): producción sirviendo sin TLS declarado.
+if ENVIRONMENT == 'production' and not USE_HTTPS:
+    warnings.warn(
+        "Producción sin TLS (USE_HTTPS=False): las cookies de sesión/CSRF viajan sin "
+        "Secure. Activa USE_HTTPS=True confiando en el reverse proxy que termina TLS "
+        "(p. ej. el Caddy del host) tras reenviar X-Forwarded-Proto.",
+        SecurityWarning,
+        stacklevel=2,
+    )
 
 ASIATECH_API_KEY = env('ASIATECH_API_KEY', default='')
 ASIATECH_API_SECRET = env('ASIATECH_API_SECRET', default='')
