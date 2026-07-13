@@ -10,6 +10,7 @@ from django.views.decorators.http import require_http_methods
 from django.contrib import messages
 from django.http import JsonResponse, HttpResponse
 from django.db.models import Q # Para el filtro en exportar_lista_empleados_excel
+from django.db import transaction # Transacciones atómicas (p. ej. borrado de horario)
 from django.utils.encoding import escape_uri_path # Para manejar nombres de archivo
 import traceback # Para un mejor manejo de errores en debug
 from django.contrib.auth import update_session_auth_hash
@@ -1045,16 +1046,21 @@ def get_horarios_empleado(request, empleado_id):
 @require_http_methods(["DELETE"])
 def api_eliminar_horario_flexible(request, horario_id):
     try:
-        horario = Horario.objects.get(pk=horario_id)
-        # No confiar en on_delete=SET_NULL: si el horario está asignado a empleados,
-        # borrarlo pondría horario=NULL silenciosamente y corrompería su asistencia.
-        if AsignacionHorario.objects.filter(horario=horario).exists():
-            return JsonResponse(
-                {"error": "No se puede eliminar: el horario está asignado a empleados."},
-                status=409,
-            )
-        horario.delete()
-        return JsonResponse({"success": "Horario eliminado correctamente y lista limpia."}, status=200)
+        with transaction.atomic():
+            # select_for_update() toma un lock de fila sobre el Horario para cerrar la
+            # ventana TOCTOU: un INSERT concurrente de AsignacionHorario queda bloqueado
+            # (PostgreSQL) hasta el commit y entonces falla por FK. El exists() dentro
+            # de esta región crítica es el chequeo autoritativo.
+            horario = Horario.objects.select_for_update().get(pk=horario_id)
+            # No confiar en on_delete=SET_NULL: si el horario está asignado a empleados,
+            # borrarlo pondría horario=NULL silenciosamente y corrompería su asistencia.
+            if AsignacionHorario.objects.filter(horario=horario).exists():
+                return JsonResponse(
+                    {"error": "No se puede eliminar: el horario está asignado a empleados."},
+                    status=409,
+                )
+            horario.delete()
+            return JsonResponse({"success": "Horario eliminado correctamente y lista limpia."}, status=200)
 
     except Horario.DoesNotExist:
         return JsonResponse({"error": "Horario no encontrado."}, status=404)

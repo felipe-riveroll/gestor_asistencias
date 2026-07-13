@@ -7,6 +7,7 @@ H3 — Borrado de horario sin autorización ni protección referencial.
 """
 from datetime import time
 
+import pandas as pd
 from django.contrib.auth.models import Group, User
 from django.core import mail
 from django.http import QueryDict
@@ -14,7 +15,8 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from core.models import AsignacionHorario, DiaSemana, Empleado, Horario, Sucursal
-from core.services import asignar_rol_service
+from core.services import AttendanceProcessor, asignar_rol_service
+from asistencias.settings import configuracion_cookies_seguras
 
 
 # --------------------------------------------------------------------------
@@ -250,3 +252,95 @@ class BorradoHorarioTest(TestCase):
         )
         self.assertEqual(resp.status_code, 200)
         self.assertFalse(Horario.objects.filter(pk=self.horario_libre.pk).exists())
+
+    def test_borrado_horario_inexistente_devuelve_404(self):
+        """Regresión H3: el wrapper transaccional (transaction.atomic + select_for_update)
+        debe preservar el manejo de errores; un id inexistente sigue dando 404."""
+        self.client.force_login(self.admin)
+        resp = self.client.delete(reverse("api_eliminar_horario", args=[999999]))
+        self.assertEqual(resp.status_code, 404)
+
+    # NOTA: la protección real frente a la condición de carrera (TOCTOU) la da el lock de
+    # select_for_update() sobre PostgreSQL, que no es reproducible en SQLite (no-op). Un
+    # test de concurrencia con hilos debe marcarse @skipUnlessDBFeature("has_select_for_update")
+    # y correr en CI con PostgreSQL; localmente el contrato 409/200/sin-nulling queda
+    # cubierto por los tests anteriores de esta clase.
+
+
+# --------------------------------------------------------------------------
+# Review adversarial (2da ronda) — H1: cookies Secure sobre HTTP
+# --------------------------------------------------------------------------
+class CookiesSecureTLSTest(TestCase):
+    """H1: las cookies Secure sólo cuando se declara TLS (USE_HTTPS), no por DEBUG."""
+
+    def test_http_puro_no_marca_cookies_secure(self):
+        c = configuracion_cookies_seguras(debug=False, use_https=False)
+        self.assertFalse(c["SESSION_COOKIE_SECURE"])
+        self.assertFalse(c["CSRF_COOKIE_SECURE"])
+        self.assertFalse(c["SECURE_SSL_REDIRECT"])
+
+    def test_tls_declarado_habilita_cookies_secure(self):
+        c = configuracion_cookies_seguras(debug=False, use_https=True)
+        self.assertTrue(c["SESSION_COOKIE_SECURE"])
+        self.assertTrue(c["CSRF_COOKIE_SECURE"])
+        self.assertTrue(c["SECURE_SSL_REDIRECT"])
+
+    def test_debug_nunca_fuerza_cookies_secure(self):
+        # DEBUG es modo desarrollo: aunque USE_HTTPS=True, en debug no se marcan Secure.
+        c = configuracion_cookies_seguras(debug=True, use_https=True)
+        self.assertFalse(c["SESSION_COOKIE_SECURE"])
+
+
+# --------------------------------------------------------------------------
+# Review adversarial (2da ronda) — H2: festivos en horas esperadas / KPIs
+# --------------------------------------------------------------------------
+class FestivosKpiTest(TestCase):
+    """H2: un festivo no laborable no debe contar como trabajo esperado en los KPIs."""
+
+    def _fila(self, festivo, trabajadas_h=0, checados=0):
+        return {
+            "employee": "1001", "Sucursal": "MATRIZ", "Nombre": "Test",
+            "es_festivo": festivo,
+            "horas_esperadas": pd.Timedelta(hours=8),
+            "duration": pd.Timedelta(hours=trabajadas_h),
+            "checados_count": checados,
+            "horario_entrada": time(8, 0),
+            "checado_primero": time(7, 55) if checados else pd.NaT,
+            "horario_salida": time(16, 0),
+            "checado_ultimo": time(16, 5) if checados else pd.NaT,
+            "tiene_permiso": False,
+            "horas_permiso": pd.Timedelta(0),
+            "horas_descanso": pd.Timedelta(0),
+        }
+
+    def test_festivo_sin_checado_no_cuenta_como_esperado(self):
+        proc = AttendanceProcessor()
+        df = pd.DataFrame([
+            self._fila(festivo=False, trabajadas_h=8, checados=2),  # día laborable
+            self._fila(festivo=True, trabajadas_h=0, checados=0),   # festivo oficial
+        ])
+        df = proc.analizar_incidencias(df)
+
+        # 1) El festivo quedó con horas_esperadas == 0 (fix en la raíz).
+        festivo = df[df["es_festivo"]].iloc[0]
+        self.assertEqual(festivo["horas_esperadas"], pd.Timedelta(0))
+
+        # 2) Propagación al resumen: total_horas_esperadas == 8h (no 16h como antes).
+        resumen = proc.calcular_resumen_final(df)
+        self.assertEqual(len(resumen), 1)
+        self.assertEqual(resumen.iloc[0]["total_horas_esperadas_td"], pd.Timedelta(hours=8))
+
+        # 3) El filtro de dias_laborables (horas_esperadas > 0) excluye al festivo.
+        laborables = df[df["horas_esperadas"].dt.total_seconds() > 0]
+        self.assertEqual(len(laborables), 1)
+
+    def test_periodo_sin_festivos_mantiene_esperado(self):
+        # Anti-regresión: sin festivos, el esperado total no se altera.
+        proc = AttendanceProcessor()
+        df = pd.DataFrame([
+            self._fila(festivo=False, trabajadas_h=8, checados=2),
+            self._fila(festivo=False, trabajadas_h=8, checados=2),
+        ])
+        df = proc.analizar_incidencias(df)
+        resumen = proc.calcular_resumen_final(df)
+        self.assertEqual(resumen.iloc[0]["total_horas_esperadas_td"], pd.Timedelta(hours=16))

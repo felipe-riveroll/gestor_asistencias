@@ -31,6 +31,7 @@ env = environ.Env(
     EMAIL_HOST_USER=(str, ''),
     EMAIL_HOST_PASSWORD=(str, ''),
     DEFAULT_FROM_EMAIL=(str, ''),
+    USE_HTTPS=(bool, False),
 )
 
 # Read .env file
@@ -224,19 +225,38 @@ SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = 'DENY'
 
-# Considerar para producción con HTTPS:
-# SECURE_SSL_REDIRECT = True
-# SESSION_COOKIE_SECURE = True
-# CSRF_COOKIE_SECURE = True
+# Cookies seguras: sólo cuando se declara TLS explícitamente (USE_HTTPS), independiente
+# de DEBUG. nginx/compose actuales sirven solo HTTP (puerto 80); marcar cookies Secure
+# sobre HTTP haría que el navegador no las enviara y rompería login/CSRF silenciosamente.
+USE_HTTPS = env('USE_HTTPS', default=False)
 
-# Cookies seguras (solo en producción cuando se usa HTTPS)
-if not DEBUG:
-    # Deshabilitar redirección SSL ya que Caddy maneja HTTPS
-    SECURE_SSL_REDIRECT = False
-    SESSION_COOKIE_SECURE = True
-    CSRF_COOKIE_SECURE = True
-    SESSION_COOKIE_HTTPONLY = True
-    CSRF_COOKIE_HTTPONLY = True
+
+def configuracion_cookies_seguras(debug: bool, use_https: bool) -> dict:
+    """Devuelve la configuración de cookies/SSL coherente con la topología declarada.
+
+    Las cookies Secure y el redirect SSL sólo se activan cuando se declara TLS
+    (USE_HTTPS=True). Sobre HTTP puro las cookies no se marcan Secure. Extraída como
+    función pura para poder testear el invariante sin recargar el módulo de settings.
+    """
+    if not debug and use_https:
+        return {
+            "SECURE_SSL_REDIRECT": True,
+            "SESSION_COOKIE_SECURE": True,
+            "CSRF_COOKIE_SECURE": True,
+        }
+    return {
+        "SECURE_SSL_REDIRECT": False,
+        "SESSION_COOKIE_SECURE": False,
+        "CSRF_COOKIE_SECURE": False,
+    }
+
+
+_cookies = configuracion_cookies_seguras(DEBUG, USE_HTTPS)
+SECURE_SSL_REDIRECT = _cookies["SECURE_SSL_REDIRECT"]
+SESSION_COOKIE_SECURE = _cookies["SESSION_COOKIE_SECURE"]
+CSRF_COOKIE_SECURE = _cookies["CSRF_COOKIE_SECURE"]
+SESSION_COOKIE_HTTPONLY = True   # HTTPOnly es seguro incluso sobre HTTP
+CSRF_COOKIE_HTTPONLY = True
 
 ASIATECH_API_KEY = env('ASIATECH_API_KEY', default='')
 ASIATECH_API_SECRET = env('ASIATECH_API_SECRET', default='')

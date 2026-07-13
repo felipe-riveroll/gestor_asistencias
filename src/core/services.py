@@ -460,8 +460,13 @@ class AttendanceProcessor:
 
         for idx, row in df.iterrows():
             # CORRECCIÓN IMPORTANTE: Si es festivo, NO calculamos incidencias numéricas (falta=0)
-            if row['es_festivo']: 
-                continue 
+            if row['es_festivo']:
+                # Un festivo no laborable no aporta horas esperadas: anularlas aquí
+                # corrige dias_laborables y todos los KPIs downstream (eficiencia,
+                # puntualidad, SIC, tasa de ausentismo). Las horas *trabajadas* en un
+                # festivo siguen sumando a 'duration' (no se borra trabajo realizado).
+                df.at[idx, 'horas_esperadas'] = pd.Timedelta(0)
+                continue
 
             if row['horas_esperadas'].total_seconds() > 0 and not row['tiene_permiso']:
                 if row['checados_count'] == 0:
