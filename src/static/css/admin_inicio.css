@@ -334,6 +334,13 @@ tr:hover {
   animation: shake 0.3s ease-in-out;
 }
 
+/* Resaltado inmediato del <select> requerido cuando el usuario lo deja sin elegir
+   (mejora progresiva: ya existe .input-group select.error que aplica la clase vía JS
+   en admin_inicio.js; :user-invalid cubre el feedback visual antes del submit). */
+.input-group select:user-invalid {
+  border: 2px solid #851e23;
+}
+
 .error-message {
   display: none;
   color: #851e23;

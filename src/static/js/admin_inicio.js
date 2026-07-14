@@ -104,3 +104,45 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 });
+
+// ==========================================
+// 3. VALIDACIÓN DEL FORMULARIO DE ADMINISTRADORES
+// ==========================================
+// El <select id="role" required> tiene una opción placeholder con value="".
+// Sin esto, al dejar el rol sin elegir el navegador bloquea el envío con la
+// validación HTML5 nativa (mensaje discreto), lo que parece que "el botón no
+// funciona". Aquí damos feedback claro antes de enviar.
+document.addEventListener('DOMContentLoaded', function() {
+    const adminForm = document.getElementById('adminForm');
+    if (!adminForm) return;
+
+    const roleSelect = document.getElementById('role');
+    const roleError = document.getElementById('roleError');
+
+    function validateRole() {
+        if (!roleSelect || !roleSelect.value) {
+            if (roleSelect) {
+                roleSelect.classList.add('error');
+                roleSelect.focus();
+            }
+            if (roleError) roleError.style.display = 'block';
+            return false;
+        }
+        if (roleSelect) roleSelect.classList.remove('error');
+        if (roleError) roleError.style.display = 'none';
+        return true;
+    }
+
+    // Quitar el error en cuanto el usuario elige un rol
+    if (roleSelect) {
+        roleSelect.addEventListener('change', validateRole);
+    }
+
+    // Validar antes de enviar (consistente con el patrón de gestion_empleados.js)
+    adminForm.addEventListener('submit', function(e) {
+        if (!validateRole()) {
+            e.preventDefault();
+            return false;
+        }
+    });
+});
