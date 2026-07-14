@@ -5,6 +5,7 @@ import pandas as pd
 from typing import Dict, List, Tuple
 import secrets
 import string
+import logging
 
 # Imports de Django
 from django.contrib.auth import authenticate
@@ -26,6 +27,8 @@ from .db_postgres_connection import obtener_horario_empleado_completo
 import numpy as np
 from django.shortcuts import get_object_or_404
 import holidays
+
+logger = logging.getLogger(__name__)
 
 def autenticar_usuario(request, email, password):
     try:
@@ -214,29 +217,45 @@ def asignar_rol_service(data, actor=None):
     alphabet = string.ascii_letters + string.digits
     password = ''.join(secrets.choice(alphabet) for i in range(12))
 
-    user = User.objects.create_user(
-        username=username, email=correo, password=password, first_name=nombre, last_name=apellido,
-    )
+    # Toda la creación del usuario + el envío del correo van en una transacción
+    # atómica: si el correo falla, se revierte la creación para no dejar un
+    # usuario huérfano cuya contraseña temporal (enviada por email) nunca llegó
+    # al destinatario. El error se reporta al admin para que corrija el SMTP.
+    try:
+        with transaction.atomic():
+            user = User.objects.create_user(
+                username=username, email=correo, password=password,
+                first_name=nombre, last_name=apellido,
+            )
 
-    # Asignar grupo y permisos
-    if rol == "Admin":
-        user.is_staff = True; user.is_superuser = True
-        grupo, _ = Group.objects.get_or_create(name="Admin")
-    else:
-        user.is_staff = True; user.is_superuser = False
-        grupo, _ = Group.objects.get_or_create(name="Manager")
+            # Asignar grupo y permisos
+            if rol == "Admin":
+                user.is_staff = True; user.is_superuser = True
+                grupo, _ = Group.objects.get_or_create(name="Admin")
+            else:
+                user.is_staff = True; user.is_superuser = False
+                grupo, _ = Group.objects.get_or_create(name="Manager")
 
-    user.save(); user.groups.add(grupo)
-    empleado.user = user; empleado.save()
+            user.save(); user.groups.add(grupo)
+            empleado.user = user; empleado.save()
 
-    # Enviar correo con las credenciales
-    asunto = "Credenciales de acceso al sistema"
-    mensaje = (
-        f"Hola {nombre},\n\nSe te ha creado un usuario en el sistema.\n\n"
-        f"Usuario: {correo}\nContraseña: {password}\n\n"
-        f"Por favor, ingresa con el correo y contraseña que se te asigno.\n\nSaludos."
-    )
-    send_mail(asunto, mensaje, settings.DEFAULT_FROM_EMAIL, [correo], fail_silently=False)
+            # Enviar correo con las credenciales (dentro de la transacción:
+            # si falla, el rollback deshace la creación del usuario)
+            asunto = "Credenciales de acceso al sistema"
+            mensaje = (
+                f"Hola {nombre},\n\nSe te ha creado un usuario en el sistema.\n\n"
+                f"Usuario: {correo}\nContraseña: {password}\n\n"
+                f"Por favor, ingresa con el correo y contraseña que se te asigno.\n\nSaludos."
+            )
+            send_mail(asunto, mensaje, settings.DEFAULT_FROM_EMAIL, [correo], fail_silently=False)
+    except Exception:
+        logger.exception("No se pudo enviar el correo de credenciales a %s", correo)
+        return {
+            "error": (
+                "No se pudo crear el usuario: falló el envío del correo con sus "
+                "credenciales. Revisa la configuración SMTP del servidor."
+            )
+        }
 
     return {"success": f"Usuario '{username}' creado y vinculado correctamente."}
 
